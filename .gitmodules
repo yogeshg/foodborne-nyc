@@ -3,3 +3,6 @@
 	url = https://github.com/tensorflow/models.git
 	ignore = dirty
 
+[submodule "foodborne-nyc.wiki"]
+	path = foodborne-nyc.wiki
+	url = https://github.com/yogeshg/foodborne-nyc.wiki.git
