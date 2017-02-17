@@ -45,7 +45,8 @@ int main(int argc, char **argv) {
   size  = r.size ;
   M     = r.M    ;
   vocab = r.vocab;
-  
+
+  fclose(f);
   return 0;
 }
 

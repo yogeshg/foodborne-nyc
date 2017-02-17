@@ -52,7 +52,6 @@ readMatReturn readMat(FILE *f) {
 
   }
   printf("read %lld words\n", b);
-  fclose(f);
   r.words = words;
   r.size = size;
   r.M = M;

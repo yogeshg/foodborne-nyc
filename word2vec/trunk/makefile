@@ -10,6 +10,8 @@ word2phrase : word2phrase.c
 	$(CC) word2phrase.c -o word2phrase $(CFLAGS)
 distance : distance.c
 	$(CC) distance.c -o distance $(CFLAGS)
+distance2 : distance2.c
+	$(CC) distance2.c -o distance2 $(CFLAGS)
 word-analogy : word-analogy.c
 	$(CC) word-analogy.c -o word-analogy $(CFLAGS)
 compute-accuracy : compute-accuracy.c
