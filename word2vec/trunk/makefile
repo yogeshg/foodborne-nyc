@@ -16,5 +16,8 @@ compute-accuracy : compute-accuracy.c
 	$(CC) compute-accuracy.c -o compute-accuracy $(CFLAGS)
 	chmod +x *.sh
 
+read-bin : read-bin.c
+	$(CC) read-bin.c -o read-bin $(CFLAGS)
+
 clean:
-	rm -rf word2vec word2phrase distance word-analogy compute-accuracy
+	rm -rf word2vec word2phrase distance word-analogy compute-accuracy read-bin
