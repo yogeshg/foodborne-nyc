@@ -1,20 +1,9 @@
-#ifndef UTIL_H
-#define UTIL_H
-
-#include "constants.h"
+#include "util.h"
 
 int isMultiple(int x, int y) {
     int total = (int) x/y;
     return x==total*y;
 }
-typedef struct _readMatReturn {
-    long long words;
-    long long size;
-    char* vocab;
-    float* M;
-    int isError;
-} readMatReturn;
-
 readMatReturn readMat(FILE *f) {
   readMatReturn r;
   r.isError = -1;
@@ -60,4 +49,3 @@ readMatReturn readMat(FILE *f) {
   return r;
 }
 
-#endif /* UTIL_H */

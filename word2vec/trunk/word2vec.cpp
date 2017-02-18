@@ -17,7 +17,9 @@
 #include <string.h>
 #include <math.h>
 #include <pthread.h>
-#include "util.hpp"
+#include "initializer.h"
+#include <vector>
+#include <cassert>
 
 #define MAX_STRING 100
 #define EXP_TABLE_SIZE 1000
@@ -353,9 +355,6 @@ void InitNet() {
     for (a = 0; a < vocab_size; a++) for (b = 0; b < layer1_size; b++)
      syn1neg[a * layer1_size + b] = 0;
   }
-  if( init_file[0]!=0 ) {
-    // readMat( f );
-  }
   for (a = 0; a < vocab_size; a++) {
     for (b = 0; b < layer1_size; b++) {
       next_random = next_random * (unsigned long long)25214903917 + 11;
@@ -365,7 +364,30 @@ void InitNet() {
       printf("initialized randomly for %s\n", vocab[a].word);
     }
   }
+  if( init_file[0] ) {
+    VocabInitializer vi(init_file);
+    vi.read();
+    assert( vi.getSize() == layer1_size );
+    for (a = 0; a < vocab_size; a++) {
+      auto vec = vi.get(vocab[a].word);
+      if( vec.size() ) {
+        for(b=0; b<layer1_size; b++) {
+          syn0[ a*layer1_size+b ] = vec[b];
+        }
+      }
+      if( isMultiple(a, vocab_size/10) ) {
+        printf("initialized from file for %s\n", vocab[a].word);
+      }
+    }
+  }
   CreateBinaryTree();
+}
+
+void InitNetFromFile() {
+    VocabInitializer vi(init_file);
+    vi.read();
+    
+
 }
 
 void *TrainModelThread(void *id) {
