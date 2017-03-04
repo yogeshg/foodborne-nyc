@@ -62,7 +62,7 @@ class Loader():
     def load_data(self):
         X = []
         y = []
-        logger.info('logging data from file, '+self.filepath)
+        logger.info('loading data from file, '+self.filepath)
         with open(self.filepath, 'rb') as f:
             for text in f:
                 line = text.split(",")
@@ -79,17 +79,37 @@ class Loader():
         return (X, y)
 
 class Embeddings():
-    def __init__(self, embeddingspath, indexer):
+    def __init__(self, embeddingspath, indexer, size=None, vocab_size=None):
         self.embeddingspath = embeddingspath
         self.embeddings = {}
         self.indexer = indexer
-        logger.info('reading embeddings from file, '+embeddingspath)
+        self.size = size
+        self.vocab_size = vocab_size
+        self.reload()
+
+    def reload(self):
+        logger.info('loading embeddings from file, '+self.embeddingspath)
         with open(self.embeddingspath, 'rb') as f:
+            (vocab_size, size) = map(int, f.readline().split())
+
+            if self.size is None:
+                self.size = size
+            assert self.size == size
+            if self.vocab_size is None:
+                self.vocab_size = vocab_size
+            assert self.vocab_size == vocab_size
+
             for text in f:
                 line = text.split()
                 token = line[0]
                 weights = [float(x) for x in line[1:]]
+                if(self.size is None):
+                    self.size = len(weights)
+                else:
+                    assert (self.size==len(weights)), 'expecting {} but got {}'.format(self.size, len(weights))
                 self.embeddings[token] = weights
+            assert self.vocab_size == len(self.embeddings)
+        return
 
     def get_embeddings(self, document):
         # document is a list of indices from indexer
