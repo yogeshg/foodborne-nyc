@@ -37,32 +37,44 @@ def get_model(maxlen=964, dimensions=200, finetune = False,
 
 def test1():
 
-    datapath = '/tmp/yo/foodborne/yelp_labelled_sample.txt'
+    datapath = '/tmp/yo/foodborne/yelp_labelled_sample.csv'
     indexpath = '/tmp/yo/foodborne/vocab_yelp_sample.txt'
     embeddingspath = '/tmp/yo/foodborne/vectors_yelp_sample.txt'
-    (X, y) = yelp.load_data(datapath, indexpath, embeddingspath)
+    ((X, y), (X_test, y_test)) = yelp.load_data(datapath, indexpath, embeddingspath)
     (samples, maxlen, dimensions) = X.shape
     model = get_model(maxlen=maxlen, dimensions=dimensions)
-    test_samples = samples // 10
-    h = model.fit(X[:-test_samples], y[:-test_samples], batch_size=10, nb_epoch=10, validation_data=(X[-test_samples:], y[-test_samples:]))
+    validation_samples = samples // 10
+
+    ratio_train_validate = 0.8
+    cut = int(ratio_train_validate * X.shape[0])
+    ((X_train, y_train), (X_validate, y_validate)) = ((X[:cut], y[:cut]), (X[cut:], y[cut:]))
+    print X_train.shape
+    print y_train.shape
+    print X_validate.shape
+    print y_validate.shape
+
+    h = model.fit(X_train, y_train, batch_size=10, nb_epoch=10, validation_data=(X_validate, y_validate))
     return h
+
 
 def test2():
 
-    datapath = '/tmp/yo/foodborne/yelp_labelled_sample.txt'
+    datapath = '/tmp/yo/foodborne/yelp_labelled.csv'
     indexpath = '/tmp/yo/foodborne/vocab_yelp.txt'
     embeddingspath = '/tmp/yo/foodborne/vectors_yelp.txt'
-    (X, y) = yelp.load_data(datapath, indexpath, embeddingspath)
+    ((X, y), (X_test, y_test)) = yelp.load_data(datapath, indexpath, embeddingspath)
     (samples, maxlen, dimensions) = X.shape
     model = get_model(maxlen=maxlen, dimensions=dimensions)
-    test_samples = samples // 10
-    h = model.fit(X[:-test_samples], y[:-test_samples], batch_size=10, nb_epoch=10, validation_data=(X[-test_samples:], y[-test_samples:]))
+    validation_samples = samples // 10
+
+    ratio_train_validate = 0.8
+    cut = int(ratio_train_validate * X.shape[0])
+    ((X_train, y_train), (X_validate, y_validate)) = ((X[:cut], y[:cut]), (X[cut:], y[cut:]))
+    print X_train.shape
+    print y_train.shape
+    print X_validate.shape
+    print y_validate.shape
+
+    h = model.fit(X_train, y_train, batch_size=10, nb_epoch=10, validation_data=(X_validate, y_validate))
     return h
-
-
-
-
-
-
-
 

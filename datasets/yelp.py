@@ -1,11 +1,13 @@
+import logging
+import csv
+
 import numpy as np
 
-import spacy
+# import spacy
 from keras.preprocessing import sequence
 
 import foodbornenyc.util.util as u
 
-import logging
 
 logging.basicConfig(level = logging.DEBUG, format=
         '%(asctime)s:%(levelname)s:%(name)s:%(threadName)s:line %(lineno)d: %(message)s')
@@ -39,6 +41,7 @@ class Index():
 class Preprocessor():
     def __init__(self, datapath='/tmp/yo/.python/spacy/data/'):
         logger.info('loading spacy from file, '+datapath)
+        import spacy
         spacy.util.set_data_path(datapath)
         self.sp = spacy.load('en')
 
@@ -64,11 +67,11 @@ class Loader():
         y = []
         logger.info('loading data from file, '+self.filepath)
         with open(self.filepath, 'rb') as f:
-            for text in f:
-                line = text.split(",")
-                label = line[0]
-                text = line[1]
-                tokens = self.pp.get_tokens(text)
+            reader = csv.reader(f)
+            ('data', 'label')==reader.next()
+            for line in reader:
+                (data, label) = line
+                tokens = self.pp.get_tokens(data)
                 try:
                     index_vectors = [self.indexer.get_index(x) for x in tokens]
                     X.append( index_vectors )
@@ -119,33 +122,36 @@ class Embeddings():
         # corpus is a list of documents:
         return [self.get_embeddings(d) for d in corpus]    
 
-def load_data( filepath, indexpath, embeddingspath, maxlen=None, dtype=np.float32):
+def load_data( datapath, indexpath, embeddingspath, maxlen=None, dtype=np.float32, ratio_dev_test=0.8):
     logger.info('local variables: '+str(locals()))
     p = Preprocessor()
     i = Index(indexpath)
-    l = Loader(filepath, i, p)
+    l = Loader(datapath, i, p)
     e = Embeddings(embeddingspath, i)
 
     (X, y) = l.load_data()
     X = sequence.pad_sequences(X, maxlen=maxlen)
     
     V = e.get_embeddings_matrix(X)
-    m = {'negative': 0, 'positive': 1}
-    y = map(lambda x: m[x], y)
+    y = map(int, y)
 
     y = np.array(y, dtype=dtype)
     V = np.array(V, dtype=dtype)
 
-    return (V, y)
+    assert V.shape[0] == y.shape[0]
+    cut = int(ratio_dev_test * V.shape[0])
+    return ((V[:cut], y[:cut]),(V[cut:], y[cut:]))
 
-def test():
+# def test():
 
-    datapath = '/tmp/yo/foodborne/yelp_labelled_sample.txt'
-    indexpath = '/tmp/yo/foodborne/vocab_yelp_sample.txt'
-    embeddingspath = '/tmp/yo/foodborne/vectors_yelp_sample.txt'
-    (X, y) = load_data(datapath, indexpath, embeddingspath)
-    print X.shape
-    print y.shape
+datapath = '/tmp/yo/foodborne/yelp_labelled_sample.csv'
+indexpath = '/tmp/yo/foodborne/vocab_yelp_sample.txt'
+embeddingspath = '/tmp/yo/foodborne/vectors_yelp_sample.txt'
+((X, y), (X_test, y_test)) = load_data(datapath, indexpath, embeddingspath)
+print X.shape
+print y.shape
+print X_test.shape
+print y_test.shape
 
-if __name__ == '__main__':
-    test()
+# if __name__ == '__main__':
+#     test()
