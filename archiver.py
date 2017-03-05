@@ -14,15 +14,16 @@ from contextlib import contextmanager
 
 def ensureDir(p):
     if(not os.path.isdir(p)):
-        logger.info('creating directory: '+p)
+        logger.debug('creating directory: '+p)
         os.makedirs(p)
     return
 
 def getTs():
     return dt.datetime.now(pytz.timezone('US/Eastern')).strftime('%Y%m%d_%H%M%S')
+    # return 'test'
 
 def cleanDir(p):
-    logger.info('cleaning directory: '+p)
+    logger.debug('cleaning directory: '+p)
     ensureDir(p)
     shutil.rmtree(p)
     ensureDir(p)
@@ -32,7 +33,7 @@ def archiveDir(CURRDIR, ARCHIVE):
     ensureDir(ARCHIVE)
     archivePath = os.path.join(ARCHIVE, getTs())
     wd, zd = os.path.split(CURRDIR)
-    logger.info('archiving directory: '+str((wd,zd)) )
+    logger.debug('archiving directory: '+str((wd,zd)) )
     st = shutil.make_archive( archivePath, 'tar', wd, zd)
     logger.info('archived directory: '+str(st) )
     return

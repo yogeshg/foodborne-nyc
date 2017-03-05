@@ -15,10 +15,11 @@ logging.basicConfig(level = logging.DEBUG, format=
 logger = u.get_logger(__name__)
 
 class Index():
-    def __init__(self, indexpath):
+    def __init__(self, indexpath, unknown_index=-1):
         self.index2tokens = []
         self.tokens2index = {}
         self.indexpath = indexpath
+        self.unknown_index = unknown_index
         logger.info('reading index from file, '+indexpath)
         with open(indexpath, 'rb') as f:
             for text in f:
@@ -29,7 +30,7 @@ class Index():
                 self.tokens2index[token] = len(self.index2tokens)-1
 
     def get_index(self, token):
-        return self.tokens2index.get(token, -1)
+        return self.tokens2index.get(token, self.unknown_index)
 
     def get_token(self, index):
         if index not in range(len(index2tokens)):
@@ -53,33 +54,6 @@ class Preprocessor():
         tokens = self.get_tokens(line)
         line2 = u.xuni(" ".join(tokens))
         return line2
-
-class Loader():
-    def __init__(self, filepath, indexer, preprocessor=None ):
-        self.filepath = filepath
-        self.pp = preprocessor
-        if( self.pp is None):
-            self.pp = Preprocessor()
-        self.indexer = indexer
-
-    def load_data(self):
-        X = []
-        y = []
-        logger.info('loading data from file, '+self.filepath)
-        with open(self.filepath, 'rb') as f:
-            reader = csv.reader(f)
-            ('data', 'label')==reader.next()
-            for line in reader:
-                (data, label) = line
-                tokens = self.pp.get_tokens(data)
-                try:
-                    index_vectors = [self.indexer.get_index(x) for x in tokens]
-                    X.append( index_vectors )
-                    y.append( label )
-                except Exception as e:
-                    logger.info(str(tokens))
-                    logger.exception(e)
-        return (X, y)
 
 class Embeddings():
     def __init__(self, embeddingspath, indexer, size=None, vocab_size=None):
@@ -122,36 +96,78 @@ class Embeddings():
         # corpus is a list of documents:
         return [self.get_embeddings(d) for d in corpus]    
 
-def load_data( datapath, indexpath, embeddingspath, maxlen=None, dtype=np.float32, ratio_dev_test=0.8):
-    logger.info('local variables: '+str(locals()))
+def cutXY(xy, ratio):
+    (x,y) = xy
+    assert len(x) == len(y), 'lengths of x ({}) and y ({}) should be the same'.format(len(x), len(y))
+    cut = int(ratio * len(x))
+    return ((x[:cut], y[:cut]),(x[cut:], y[cut:]))
+
+class Loader():
+    def __init__(self, filepath, indexer, preprocessor=None ):
+        self.filepath = filepath
+        self.pp = preprocessor
+        if( self.pp is None):
+            self.pp = Preprocessor()
+        self.indexer = indexer
+
+    def load_data(self, dtype=None, maxlen=None, ratio_dev_test=0.8):
+        X = []
+        y = []
+        logger.info('loading data from file, '+self.filepath)
+        with open(self.filepath, 'rb') as f:
+            reader = csv.reader(f)
+            ('data', 'label')==reader.next()
+            for line in reader:
+                (data, label) = line
+                tokens = self.pp.get_tokens(data)
+                try:
+                    index_vectors = [self.indexer.get_index(x) for x in tokens]
+                    X.append( index_vectors )
+                    y.append( int(label) )
+                except Exception as e:
+                    logger.info(str(tokens))
+                    logger.exception(e)
+        X = sequence.pad_sequences(X, maxlen=maxlen)
+
+        if(not dtype is None):
+            X = np.array(X, dtype=dtype)
+            y = np.array(y, dtype=dtype)
+
+        return cutXY((X, y), ratio_dev_test)
+
+def load_devset_testset_index(datapath, indexpath, maxlen=None, dtype=np.float32, ratio_dev_test=0.8):
+    logger.debug('loading yelp data and index: '+str(locals()))
     p = Preprocessor()
-    i = Index(indexpath)
+    i = Index(indexpath, unknown_index=0)
     l = Loader(datapath, i, p)
-    e = Embeddings(embeddingspath, i)
 
-    (X, y) = l.load_data()
-    X = sequence.pad_sequences(X, maxlen=maxlen)
-    
-    V = e.get_embeddings_matrix(X)
-    y = map(int, y)
+    (devset, testset) = l.load_data(dtype=dtype, ratio_dev_test=ratio_dev_test)
 
-    y = np.array(y, dtype=dtype)
-    V = np.array(V, dtype=dtype)
+    return (devset, testset, i.index2tokens)
 
-    assert V.shape[0] == y.shape[0]
-    cut = int(ratio_dev_test * V.shape[0])
-    return ((V[:cut], y[:cut]),(V[cut:], y[cut:]))
+def load_embeddings_matrix(indexpath, embeddingspath):
+    logger.debug('loading yelp embeddings: '+str(locals()))
+    indexer = Index(indexpath, unknown_index=0)
+    embedder = Embeddings(embeddingspath, indexer)
+    message = 'embeddings ({}) and index ({}) size should match'.format(embedder.vocab_size, len(indexer.index2tokens))
+    assert(embedder.vocab_size == len(indexer.index2tokens)), message
+
+    m = np.zeros((embedder.vocab_size, embedder.size))
+    for i,w in enumerate(indexer.index2tokens):
+        m[i] = embedder.embeddings[w]
+    return m
 
 def test():
 
     datapath = '/tmp/yo/foodborne/yelp_labelled_sample.csv'
     indexpath = '/tmp/yo/foodborne/vocab_yelp_sample.txt'
     embeddingspath = '/tmp/yo/foodborne/vectors_yelp_sample.txt'
-    ((X, y), (X_test, y_test)) = load_data(datapath, indexpath, embeddingspath)
-    print X.shape
-    print y.shape
-    print X_test.shape
-    print y_test.shape
+    ((X, y), (X_test, y_test), index2tokens) = load_devset_testset_index(datapath, indexpath)
+    print (X.shape, y.shape)
+    print (X_test.shape, y_test.shape)
+    print len(index2tokens)
+    m = load_embeddings_matrix(indexpath, embeddingspath)
+    print m.shape
 
 if __name__ == '__main__':
     test()
