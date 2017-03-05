@@ -3,7 +3,11 @@ from keras.models import Sequential
 from keras.layers import Dense
 from keras.layers import Embedding
 from keras.layers import GlobalAveragePooling1D
+from keras.callbacks import EarlyStopping, ModelCheckpoint
 from datasets import yelp
+
+import json
+import pandas as pd
 
 def get_model(maxlen=964, dimensions=200, finetune = False,
             pooling = 'average', ngrams = None, num_filters = None):
@@ -34,6 +38,14 @@ def get_model(maxlen=964, dimensions=200, finetune = False,
     model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
     return model
 
+def save_history(history, dirpath):
+    with open(dirpath+'/params.json', 'w') as f:
+        json.dump(history.params, f, indent=2)
+    df = pd.DataFrame.from_dict(history.history)
+    df.to_csv(dirpath+'/history.csv')
+    with open(dirpath+'/model.json', 'w') as f:
+        f.write(history.model.to_json(indent=2))
+    return
 
 def test1():
 
@@ -74,7 +86,17 @@ def test2():
     print y_train.shape
     print X_validate.shape
     print y_validate.shape
-
-    h = model.fit(X_train, y_train, batch_size=10, nb_epoch=10, validation_data=(X_validate, y_validate))
+    results_dir = '/tmp/yo/foodborne/results/test/'
+    modelpath = 'weights.{epoch:02d}-{val_loss:.2f}.hdf5'
+    callbacks = [
+        EarlyStopping(monitor='val_acc', patience=500, verbose=0),
+        ModelCheckpoint(results_dir+modelpath, monitor='val_acc',
+            save_best_only=True, verbose=0),
+    ]
+    h = model.fit(X_train, y_train, batch_size=128, nb_epoch=2000,
+        validation_data=(X_validate, y_validate), callbacks=callbacks)
+    save_history(h, results_dir)
     return h
 
+if __name__ == '__main__':
+    test2()

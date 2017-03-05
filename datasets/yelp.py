@@ -142,16 +142,16 @@ def load_data( datapath, indexpath, embeddingspath, maxlen=None, dtype=np.float3
     cut = int(ratio_dev_test * V.shape[0])
     return ((V[:cut], y[:cut]),(V[cut:], y[cut:]))
 
-# def test():
+def test():
 
-datapath = '/tmp/yo/foodborne/yelp_labelled_sample.csv'
-indexpath = '/tmp/yo/foodborne/vocab_yelp_sample.txt'
-embeddingspath = '/tmp/yo/foodborne/vectors_yelp_sample.txt'
-((X, y), (X_test, y_test)) = load_data(datapath, indexpath, embeddingspath)
-print X.shape
-print y.shape
-print X_test.shape
-print y_test.shape
+    datapath = '/tmp/yo/foodborne/yelp_labelled_sample.csv'
+    indexpath = '/tmp/yo/foodborne/vocab_yelp_sample.txt'
+    embeddingspath = '/tmp/yo/foodborne/vectors_yelp_sample.txt'
+    ((X, y), (X_test, y_test)) = load_data(datapath, indexpath, embeddingspath)
+    print X.shape
+    print y.shape
+    print X_test.shape
+    print y_test.shape
 
-# if __name__ == '__main__':
-#     test()
+if __name__ == '__main__':
+    test()
