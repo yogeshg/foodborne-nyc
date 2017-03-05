@@ -72,6 +72,9 @@ class Archiver(object):
         self.info['open'] = getTs()
         return
 
+    def getDirPath(self):
+        return self.CURRDIR
+
     def getFilePath(self, p):
         return os.path.join(self.CURRDIR, p)
 

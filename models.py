@@ -6,8 +6,13 @@ from keras.layers import GlobalAveragePooling1D
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from datasets import yelp
 
+from archiver import get_archiver
+
 import json
 import pandas as pd
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 def get_model(maxlen=964, dimensions=200, finetune = False,
             pooling = 'average', ngrams = None, num_filters = None):
@@ -45,6 +50,15 @@ def save_history(history, dirpath):
     df.to_csv(dirpath+'/history.csv')
     with open(dirpath+'/model.json', 'w') as f:
         f.write(history.model.to_json(indent=2))
+    i = df.val_acc.argmax()
+    cname = 'val_acc_{:04d}'.format(i)
+    df.loc[:, cname] = df.loc[i,'val_acc']
+    df.loc[:, ['acc', 'val_acc', cname]].plot()
+    plt.savefig(dirpath+'/acc.png')
+    cname = 'val_loss_{:04d}'.format(i)
+    df.loc[:, cname] = df.loc[i,'loss_acc']
+    df.loc[:, ['loss', 'val_loss', cname]].plot()
+    plt.savefig(dirpath+'/loss.png')
     return
 
 def test1():
@@ -87,15 +101,17 @@ def test2():
     print X_validate.shape
     print y_validate.shape
     results_dir = '/tmp/yo/foodborne/results/test/'
-    modelpath = 'weights.{epoch:02d}-{val_loss:.2f}.hdf5'
-    callbacks = [
-        EarlyStopping(monitor='val_acc', patience=500, verbose=0),
-        ModelCheckpoint(results_dir+modelpath, monitor='val_acc',
-            save_best_only=True, verbose=0),
-    ]
-    h = model.fit(X_train, y_train, batch_size=128, nb_epoch=2000,
-        validation_data=(X_validate, y_validate), callbacks=callbacks)
-    save_history(h, results_dir)
+    with get_archiver(datadir='/tmp/yo/foodborne/results') as temp, get_archiver() as a:
+
+        modelpath = temp.getFilePath('weights.hdf5')
+        callbacks = [
+            EarlyStopping(monitor='val_acc', patience=50, verbose=0),
+            ModelCheckpoint(modelpath, monitor='val_acc',
+                save_best_only=True, verbose=0),
+        ]
+        h = model.fit(X_train, y_train, batch_size=128, nb_epoch=2000,
+            validation_data=(X_validate, y_validate), callbacks=callbacks)
+        save_history(h, a.getDirPath())
     return h
 
 if __name__ == '__main__':
