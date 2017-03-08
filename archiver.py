@@ -43,12 +43,14 @@ def archiveDir(CURRDIR, ARCHIVE):
 # CURRDIR = os.path.join(DATADIR, 'current')
 # ARCHIVE = os.path.join(DATADIR, 'archive')
 
+DEFAULT_CURRDIR = 'current_'+getTs()
+
 class Archiver(object):
     def __init__(self, datadir=None, currdir=None, archive=None, writeInfoFile=True):
         if(datadir is None):
             datadir = os.path.join(os.getcwd(), 'data')
         if(currdir is None):
-            currdir = os.path.join(datadir, 'current')
+            currdir = os.path.join(datadir, DEFAULT_CURRDIR)
         if(archive is None):
             archive = os.path.join(datadir, 'archive')
         self.DATADIR = datadir

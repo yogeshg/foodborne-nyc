@@ -163,7 +163,10 @@ if __name__ == '__main__':
             for filter_lengths_size in range(4):
                 filter_lengths = tuple((x+1 for x in range(filter_lengths_size)))
                 if(experiment_id in experiments_to_run):
+                  try:
                     logging.info('running experiment_id: {}'.format(experiment_id))
                     run_experiments(finetune=finetune, filter_lengths = filter_lengths, nb_filter = nb_filter)
+                  except Exception as e:
+                    logging.exception(e)
                 experiment_id += 1
     pass
