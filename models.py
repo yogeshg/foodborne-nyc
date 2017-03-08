@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 import foodbornenyc.util.util as u
 
@@ -7,11 +8,10 @@ logging.basicConfig(level = logging.INFO, format=
 
 from keras.preprocessing import sequence
 from keras.models import Model, Sequential
-from keras.layers import Input
-from keras.layers import Dense
-from keras.layers import Embedding
-from keras.layers import GlobalAveragePooling1D
+from keras.layers import Input, Dense, Embedding, GlobalMaxPooling1D, Convolution1D, merge
 from keras.callbacks import EarlyStopping, ModelCheckpoint
+from keras.utils.visualize_util import plot
+
 from datasets import yelp
 
 from archiver import get_archiver
@@ -24,32 +24,45 @@ import matplotlib.pyplot as plt
 
 logger = u.get_logger(__name__)
 
-def get_model(maxlen=964, dimensions=200, finetune = False, vocab_size=1000,
-            pooling = 'average', ngrams = None, num_filters = None, embeddings_matrix=None):
+def get_conv_stack(input_layer, nb_filter, filter_lengths, activation):
+    layers = [Convolution1D(nb_filter=nb_filter, filter_length=f,
+            border_mode='same', activation=activation,
+            subsample_length=1)(input_layer) for f in filter_lengths]
+    if (len(layers) <= 0):
+        return input_layer
+    elif (len(layers) == 1):
+        return layers[0]
+    else:
+        return merge(layers, mode='concat')
+
+def get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000,
+            pooling='max', filter_lengths=(), nb_filter=0, weights=None):
     '''
     maxlen : maximum size of each document
     dimensions : dimension of each vector
     finetune : [True, False] : weather or not to finetune word emdeddings
     vocab_size : size of the vocabulary, emdeddings layer will be this big
     pooling : ['average', 'logsumexp'] : pooling operation for word vectors in a document
-    ngrams : None or tuple : convolve using unigrams / bigrams / trigrams
-    num_filters : None or int : number of filters for convolutional layer
+    filter_lengths : tuple : convolve using unigrams / bigrams / trigrams
+    nb_filter : None or int : number of filters for convolutional layer
     '''
     assert(type(dimensions)==int), type(dimensions)
     assert(type(maxlen)==int), type(maxlen)
     assert(type(finetune)==bool), type(finetune)
     assert(type(vocab_size)==int), type(vocab_size)
-    assert(pooling in ['average', 'logsumexp']), '{} not in {}'.format(str(pooling), str(['average', 'logsumexp']))
-    assert (ngrams is None) or (all([x in (1,2,3) for x in ngrams])), '{} not in {}'.format(str(ngrams), str((1,2,3)))
-    assert (num_filters is None) or (type(num_filters)==int), type(num_filters)
-    params = {k:v for k,v in locals().iteritems() if k!='embeddings_matrix'}
+    assert(pooling in ['max', 'average', 'logsumexp']), '{} not in {}'.format(str(pooling), str(['max', 'average', 'logsumexp']))
+    assert (all([x in (1,2,3) for x in filter_lengths])), '{} not in {}'.format(str(filter_lengths), str((1,2,3)))
+    assert (type(nb_filter)==int), type(nb_filter)
+    params = {k:v for k,v in locals().iteritems() if k!='weights'}
 
     print params # TODO print into file
 
     doc_input = Input(shape=(maxlen,), dtype='int32')
-    embedding_layer = Embedding(vocab_size, dimensions, weights=[embeddings_matrix], input_length=maxlen, trainable=finetune)
+    embedding_layer = Embedding(vocab_size, dimensions, weights=weights, input_length=maxlen, trainable=finetune)
     y = embedding_layer(doc_input)
-    y = GlobalAveragePooling1D(input_shape=(maxlen, dimensions))(y)
+    y = get_conv_stack(y, nb_filter, filter_lengths, 'relu')
+    assert(pooling=='max'), '{} not implemented yet'.format(pooling)
+    y = GlobalMaxPooling1D()(y)
     y = Dense(1, activation='sigmoid')(y)
 
     model = Model(doc_input, y)
@@ -79,7 +92,7 @@ def save_history(history, dirpath):
 
     return
 
-def test(full_data=False):
+def main(full_data=False, finetune=False, filter_lengths = None, nb_filter = None):
 
     if(full_data):
         datapath = '/tmp/yo/foodborne/yelp_labelled.csv'
@@ -100,11 +113,13 @@ def test(full_data=False):
 
     maxlen = X.shape[1]
     (vocab_size, dimensions) = embeddings_matrix.shape
-    model, params = get_model(maxlen=maxlen, dimensions=dimensions,
-        vocab_size=vocab_size, embeddings_matrix=embeddings_matrix)
+    model, params = get_model(
+        maxlen=maxlen, dimensions=dimensions, finetune=finetune, vocab_size=vocab_size,
+        filter_lengths = filter_lengths, nb_filter = nb_filter, weights=[embeddings_matrix])
 
     results_dir = '/tmp/yo/foodborne/results/test/'
-    with get_archiver(datadir='/tmp/yo/foodborne/results') as temp, get_archiver() as a:
+    # with get_archiver(datadir='/tmp/yo/foodborne/results') as temp, get_archiver() as a:
+    with get_archiver() as a:
 
         with open(a.getFilePath('hyperparameters.json'), 'w') as f:
             json.dump(params, f, indent=2)
@@ -112,19 +127,30 @@ def test(full_data=False):
         with open(a.getFilePath('model.json'), 'w') as f:
             f.write(model.to_json(indent=2))
 
-        modelpath = temp.getFilePath('weights.hdf5')
-        callbacks = [
-            EarlyStopping(monitor='val_acc', patience=10, verbose=0),
-            ModelCheckpoint(modelpath, monitor='val_acc',
-                save_best_only=True, verbose=0),
-        ]
-        h = model.fit(X_train, y_train, batch_size=128, nb_epoch=2000,
-            validation_data=(X_validate, y_validate), callbacks=callbacks)
+        stdout = sys.stdout
+        with open(a.getFilePath('summary.txt'), 'w') as sys.stdout:
+            model.summary()
+        sys.stdout = stdout
 
-        save_history(h, a.getDirPath())
+        plot(model, to_file=a.getFilePath('model.png'), show_shapes=True, show_layer_names=True)
 
-    return h
+        # modelpath = temp.getFilePath('weights.hdf5')
+        # callbacks = [
+        #     EarlyStopping(monitor='val_acc', patience=200, verbose=0),
+        #     ModelCheckpoint(modelpath, monitor='val_acc',
+        #         save_best_only=True, verbose=0),
+        # ]
+        # h = model.fit(X_train, y_train, batch_size=128, nb_epoch=2000,
+        #     validation_data=(X_validate, y_validate), callbacks=callbacks)
+
+        # save_history(h, a.getDirPath())
+
+    return
 
 if __name__ == '__main__':
-    test(False)
+    for finetune in (False. True):
+        for nb_filter in (50,100,200):
+            for filter_lengths_size in range(4):
+                filter_lengths = tuple((x+1 for x in range(filter_lengths_size)))
+                main(full_data=False, finetune=finetune, filter_lengths = filter_lengths, nb_filter = nb_filter)
     pass
