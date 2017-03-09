@@ -11,7 +11,7 @@ from keras.models import Model, Sequential
 from keras.layers import Input, Dense, Embedding, GlobalMaxPooling1D, Convolution1D, merge
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.utils.visualize_util import plot
-
+from keras.optimizers import Adam
 from datasets import yelp
 
 from archiver import get_archiver
@@ -36,7 +36,8 @@ def get_conv_stack(input_layer, nb_filter, filter_lengths, activation):
         return merge(layers, mode='concat')
 
 def get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000,
-            pooling='max', filter_lengths=(), nb_filter=0, weights=None):
+            pooling='max', filter_lengths=(), nb_filter=0, weights=None,
+            lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0 ):
     '''
     maxlen : maximum size of each document
     dimensions : dimension of each vector
@@ -67,8 +68,8 @@ def get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000,
 
     model = Model(doc_input, y)
     model.summary() # TODO print into file
-
-    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+    adam = Adam(lr=lr, beta_1=beta_1, beta_2=beta_2, epsilon=epsilon, decay=decay)
+    model.compile(loss='binary_crossentropy', optimizer=adam, metrics=['accuracy'])
 
     return (model, params)
 
@@ -154,19 +155,25 @@ def run_experiments(finetune=False, filter_lengths = None, nb_filter = None):
 
     return
 
-if __name__ == '__main__':
+def main():
     experiment_id = 0
     experiments_to_run = map(int, sys.argv[1:])
     load_data(full_data=True)
-    for finetune in (False, True):
-        for nb_filter in (50,100,200):
-            for filter_lengths_size in range(4):
-                filter_lengths = tuple((x+1 for x in range(filter_lengths_size)))
-                if(experiment_id in experiments_to_run):
-                  try:
-                    logging.info('running experiment_id: {}'.format(experiment_id))
-                    run_experiments(finetune=finetune, filter_lengths = filter_lengths, nb_filter = nb_filter)
-                  except Exception as e:
-                    logging.exception(e)
-                experiment_id += 1
-    pass
+    for finetune in (False,):
+        for lr in (1e-3, 1e-4, 1e-5):
+            for nb_filter in (5,10,25,50,75,100):
+                for filter_lengths_size in range(4):
+                    filter_lengths = tuple((x+1 for x in range(filter_lengths_size)))
+                    if(experiment_id in experiments_to_run):
+                      try:
+                        logging.info('running experiment_id: {}'.format(experiment_id))
+                        run_experiments(finetune=finetune, filter_lengths = filter_lengths, nb_filter = nb_filter)
+                      except Exception as e:
+                        logging.exception(e)
+                    experiment_id += 1
+    return
+
+if __name__ == '__main__':
+    main()
+
+
