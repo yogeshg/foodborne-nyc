@@ -8,7 +8,7 @@ logging.basicConfig(level = logging.INFO, format=
 
 from keras.preprocessing import sequence
 from keras.models import Model, Sequential
-from keras.layers import Input, Dense, Embedding, GlobalMaxPooling1D, Convolution1D, merge
+from keras.layers import Input, Dense, Embedding, GlobalMaxPooling1D, Convolution1D, merge, Dropout
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.utils.visualize_util import plot
 from keras.optimizers import Adam
@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 
 logger = u.get_logger(__name__)
 
-def get_conv_stack(input_layer, nb_filter, filter_lengths, activation):
+def get_conv_stack(input_layer, nb_filter, filter_lengths, activation, dropout_rate):
     layers = [Convolution1D(nb_filter=nb_filter, filter_length=f,
             border_mode='same', activation=activation,
             subsample_length=1)(input_layer) for f in filter_lengths]
@@ -33,10 +33,11 @@ def get_conv_stack(input_layer, nb_filter, filter_lengths, activation):
     elif (len(layers) == 1):
         return layers[0]
     else:
-        return merge(layers, mode='concat')
+        return Dropout(dropout_rate, noise_shape=None, seed=None)(merge(layers, mode='concat'))
 
 def get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000,
             pooling='max', filter_lengths=(), nb_filter=0, weights=None,
+            dropout_rate=0,
             lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0 ):
     '''
     maxlen : maximum size of each document
@@ -61,7 +62,7 @@ def get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000,
     doc_input = Input(shape=(maxlen,), dtype='int32')
     embedding_layer = Embedding(vocab_size, dimensions, weights=weights, input_length=maxlen, trainable=finetune)
     y = embedding_layer(doc_input)
-    y = get_conv_stack(y, nb_filter, filter_lengths, 'relu')
+    y = get_conv_stack(y, nb_filter, filter_lengths, 'relu', dropout_rate=dropout_rate)
     assert(pooling=='max'), '{} not implemented yet'.format(pooling)
     y = GlobalMaxPooling1D()(y)
     y = Dense(1, activation='sigmoid')(y)
@@ -116,14 +117,15 @@ def load_data(full_data=False):
 
 
 
-def run_experiments(finetune=False, filter_lengths = None, nb_filter = None):
+def run_experiments(finetune, filter_lengths, nb_filter, lr):
     global embeddings_matrix, X_train, y_train, X_validate, y_validate, X_test, y_test
 
     maxlen = X_train.shape[1]
     (vocab_size, dimensions) = embeddings_matrix.shape
     model, params = get_model(
         maxlen=maxlen, dimensions=dimensions, finetune=finetune, vocab_size=vocab_size,
-        filter_lengths = filter_lengths, nb_filter = nb_filter, weights=[embeddings_matrix])
+        filter_lengths = filter_lengths, nb_filter = nb_filter, weights=[embeddings_matrix],
+        dropout_rate=0.5, lr=lr)
 
     results_dir = '/tmp/yo/foodborne/results/test/'
     with get_archiver(datadir='/tmp/yo/foodborne/results') as temp, get_archiver() as a:
@@ -160,14 +162,15 @@ def main():
     experiments_to_run = map(int, sys.argv[1:])
     load_data(full_data=True)
     for finetune in (False,):
-        for lr in (1e-3, 1e-4, 1e-5):
-            for nb_filter in (5,10,25,50,75,100):
+        for nb_filter in (5,10,25):
+            for lr in (1e-3, 1e-4, 1e-5):
                 for filter_lengths_size in range(4):
                     filter_lengths = tuple((x+1 for x in range(filter_lengths_size)))
                     if(experiment_id in experiments_to_run):
                       try:
                         logging.info('running experiment_id: {}'.format(experiment_id))
-                        run_experiments(finetune=finetune, filter_lengths = filter_lengths, nb_filter = nb_filter)
+                        run_experiments(finetune=finetune, filter_lengths=filter_lengths,
+                            nb_filter=nb_filter, lr=lr)
                       except Exception as e:
                         logging.exception(e)
                     experiment_id += 1
