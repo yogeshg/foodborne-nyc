@@ -33,7 +33,7 @@ class Index():
         return self.tokens2index.get(token, self.unknown_index)
 
     def get_token(self, index):
-        if index not in range(len(index2tokens)):
+        if index not in range(len(self.index2tokens)):
             return 'NONE'
         else:
             return self.index2tokens[index]
@@ -93,8 +93,19 @@ class Embeddings():
         return [self.embeddings[self.indexer.index2tokens[w]] for w in document]
     
     def get_embeddings_matrix(self, corpus):
-        # corpus is a list of documents:
-        return [self.get_embeddings(d) for d in corpus]    
+        # corpus is a list of documents
+        return [self.get_embeddings(d) for d in corpus]
+    
+    def set_embeddings_matrix(self, embedding_matrix, fname):
+        # need to create token -> vector
+        with open(fname, 'w') as f:
+            f.write(' '.join(map(str,embedding_matrix.shape)))
+            f.write('\n')
+            for i,v in enumerate(embedding_matrix):
+                k = self.indexer.get_token(i)
+                f.write(' '.join([k]+[str(x) for x in v]))
+                f.write('\n')
+        
 
 def cutXY(xy, ratio):
     (x,y) = xy

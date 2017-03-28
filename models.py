@@ -94,19 +94,12 @@ def save_history(history, dirpath):
 
     return
 
-def load_data(full_data=False):
-    global embeddings_matrix, X_train, y_train, X_validate, y_validate, X_test, y_test
-
-    if (full_data):
-        datapath = '/tmp/yo/foodborne/yelp_labelled.csv'
-        indexpath = '/tmp/yo/foodborne/vocab_yelp.txt'
-        embeddingspath = '/tmp/yo/foodborne/vectors_yelp.txt'
-    else:
+def load_data(datapath, indexpath, embeddingspath, testdata=False):
+    if( testdata ):
         datapath = '/tmp/yo/foodborne/yelp_labelled_sample.csv'
         indexpath = '/tmp/yo/foodborne/vocab_yelp_sample.txt'
         embeddingspath = '/tmp/yo/foodborne/vectors_yelp_sample.txt'
-
-
+    
     embeddings_matrix = yelp.load_embeddings_matrix(indexpath, embeddingspath)
     ((X, y), (X_test, y_test), _) = yelp.load_devset_testset_index(datapath, indexpath, ratio_dev_test=0.8)
     ratio_train_validate = 0.8
@@ -160,8 +153,10 @@ def run_experiments(finetune, filter_lengths, nb_filter, lr):
 def main():
     experiment_id = 0
     experiments_to_run = map(int, sys.argv[1:])
-    load_data(full_data=True)
-    for finetune in (False,):
+    datapath = '/tmp/yo/foodborne/yelp_labelled.csv'
+    indexpath = '/tmp/yo/foodborne/vocab_yelp.txt'
+    for embeddingspath in ('/tmp/yo/foodborne/vectors_yelp_2.txt', '/tmp/yo/foodborne/vectors_yelp.txt'):
+        load_data(datapath, indexpath, embeddingspath, testdata=False)
         for nb_filter in (5,10,25):
             for lr in (1e-3, 1e-4, 1e-5):
                 for filter_lengths_size in range(4):
@@ -178,5 +173,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-
 
