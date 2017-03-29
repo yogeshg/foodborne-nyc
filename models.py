@@ -10,8 +10,10 @@ from keras.preprocessing import sequence
 from keras.models import Model, Sequential
 from keras.layers import Input, Dense, Embedding, GlobalMaxPooling1D, Convolution1D, merge, Dropout
 from keras.callbacks import EarlyStopping, ModelCheckpoint
-from keras.utils.visualize_util import plot
+from keras.utils import plot_model
 from keras.optimizers import Adam
+from keras.engine.topology import Layer
+from keras import backend as K
 from datasets import yelp
 
 from archiver import get_archiver
@@ -23,6 +25,23 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 logger = u.get_logger(__name__)
+
+def add_defaults(d1, d2):
+     d22 = dict(d2)
+     d11 = dict(d1)
+     d22.update(d11)
+     d11.update(d22)
+     return d11
+
+class LogSumExpPooling(Layer):
+
+    def call(self, x):
+        # could be axis 0 or 1
+        import numpy as np
+        return K.log(K.sum(K.exp(x), axis=1))
+
+    def compute_output_shape(self, input_shape):
+        return input_shape[:1]+input_shape[2:]
 
 def get_conv_stack(input_layer, nb_filter, filter_lengths, activation, dropout_rate):
     layers = [Convolution1D(nb_filter=nb_filter, filter_length=f,
@@ -63,8 +82,13 @@ def get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000,
     embedding_layer = Embedding(vocab_size, dimensions, weights=weights, input_length=maxlen, trainable=finetune)
     y = embedding_layer(doc_input)
     y = get_conv_stack(y, nb_filter, filter_lengths, 'relu', dropout_rate=dropout_rate)
-    assert(pooling=='max'), '{} not implemented yet'.format(pooling)
-    y = GlobalMaxPooling1D()(y)
+    if(pooling=='max'):
+        y = GlobalMaxPooling1D()(y)
+    elif(pooling=='logsumexp'):
+        y = LogSumExpPooling()(y)
+    else:
+        assert(pooling in ['max', 'logsumexp']), '{} not implemented yet'.format(pooling)
+
     y = Dense(1, activation='sigmoid')(y)
 
     model = Model(doc_input, y)
@@ -95,6 +119,7 @@ def save_history(history, dirpath):
     return
 
 def load_data(datapath, indexpath, embeddingspath, testdata=False):
+    global embeddings_matrix, X_train, y_train, X_validate, y_validate, X_test, y_test
     if( testdata ):
         datapath = '/tmp/yo/foodborne/yelp_labelled_sample.csv'
         indexpath = '/tmp/yo/foodborne/vocab_yelp_sample.txt'
@@ -110,7 +135,8 @@ def load_data(datapath, indexpath, embeddingspath, testdata=False):
 
 
 
-def run_experiments(finetune, filter_lengths, nb_filter, lr):
+def run_experiments(finetune, filter_lengths, nb_filter, lr, pooling, other_params):
+    assert (type(other_params)), type(other_params)
     global embeddings_matrix, X_train, y_train, X_validate, y_validate, X_test, y_test
 
     maxlen = X_train.shape[1]
@@ -118,7 +144,9 @@ def run_experiments(finetune, filter_lengths, nb_filter, lr):
     model, params = get_model(
         maxlen=maxlen, dimensions=dimensions, finetune=finetune, vocab_size=vocab_size,
         filter_lengths = filter_lengths, nb_filter = nb_filter, weights=[embeddings_matrix],
-        dropout_rate=0.5, lr=lr)
+        dropout_rate=0.5, lr=lr, pooling=pooling)
+    params = add_defaults(params, other_params)
+    # TODO add other params here params['embeddingspath'] = 
 
     results_dir = '/tmp/yo/foodborne/results/test/'
     with get_archiver(datadir='/tmp/yo/foodborne/results') as temp, get_archiver() as a:
@@ -135,7 +163,7 @@ def run_experiments(finetune, filter_lengths, nb_filter, lr):
             model.summary()
         sys.stdout = stdout
 
-        plot(model, to_file=a.getFilePath('model.png'), show_shapes=True, show_layer_names=True)
+        plot_model(model, to_file=a.getFilePath('model.png'), show_shapes=True, show_layer_names=True)
 
         modelpath = temp.getFilePath('weights.hdf5')
         callbacks = [
@@ -157,15 +185,16 @@ def main():
     indexpath = '/tmp/yo/foodborne/vocab_yelp.txt'
     for embeddingspath in ('/tmp/yo/foodborne/vectors_yelp_2.txt', '/tmp/yo/foodborne/vectors_yelp.txt'):
         load_data(datapath, indexpath, embeddingspath, testdata=False)
-        for nb_filter in (5,10,25):
-            for lr in (1e-3, 1e-4, 1e-5):
-                for filter_lengths_size in range(4):
+        for nb_filter in (5,10,25,50):
+            lr = 1e-3
+            for pooling in ['logsumexp']:
+                for filter_lengths_size in [3]:
                     filter_lengths = tuple((x+1 for x in range(filter_lengths_size)))
                     if(experiment_id in experiments_to_run):
                       try:
                         logging.info('running experiment_id: {}'.format(experiment_id))
-                        run_experiments(finetune=finetune, filter_lengths=filter_lengths,
-                            nb_filter=nb_filter, lr=lr)
+                        run_experiments(finetune=False, filter_lengths=filter_lengths,
+                            nb_filter=nb_filter, lr=lr, pooling=pooling, other_params={'embeddingspath':embeddingspath})
                       except Exception as e:
                         logging.exception(e)
                     experiment_id += 1
