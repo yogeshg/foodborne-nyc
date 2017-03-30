@@ -9,6 +9,7 @@ logging.basicConfig(level = logging.INFO, format=
 from keras.preprocessing import sequence
 from keras.models import Model, Sequential
 from keras.layers import Input, Dense, Embedding, GlobalMaxPooling1D, Convolution1D, merge, Dropout
+from keras import regularizers
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.utils import plot_model
 from keras.optimizers import Adam
@@ -43,9 +44,9 @@ class LogSumExpPooling(Layer):
     def compute_output_shape(self, input_shape):
         return input_shape[:1]+input_shape[2:]
 
-def get_conv_stack(input_layer, nb_filter, filter_lengths, activation, dropout_rate):
+def get_conv_stack(input_layer, nb_filter, filter_lengths, activation, dropout_rate, kernel_l2_regularization):
     layers = [Convolution1D(nb_filter=nb_filter, filter_length=f,
-            border_mode='same', activation=activation,
+            border_mode='same', activation=activation, kernel_regularizer=regularizers.l2(kernel_l2_regularization),
             subsample_length=1)(input_layer) for f in filter_lengths]
     if (len(layers) <= 0):
         return input_layer
@@ -56,7 +57,7 @@ def get_conv_stack(input_layer, nb_filter, filter_lengths, activation, dropout_r
 
 def get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000,
             pooling='max', filter_lengths=(), nb_filter=0, weights=None,
-            dropout_rate=0,
+            dropout_rate=0, kernel_l2_regularization=0,
             lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0 ):
     '''
     maxlen : maximum size of each document
@@ -81,7 +82,7 @@ def get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000,
     doc_input = Input(shape=(maxlen,), dtype='int32')
     embedding_layer = Embedding(vocab_size, dimensions, weights=weights, input_length=maxlen, trainable=finetune)
     y = embedding_layer(doc_input)
-    y = get_conv_stack(y, nb_filter, filter_lengths, 'relu', dropout_rate=dropout_rate)
+    y = get_conv_stack(y, nb_filter, filter_lengths, 'relu', dropout_rate, kernel_l2_regularization)
     if(pooling=='max'):
         y = GlobalMaxPooling1D()(y)
     elif(pooling=='logsumexp'):
@@ -89,7 +90,7 @@ def get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000,
     else:
         assert(pooling in ['max', 'logsumexp']), '{} not implemented yet'.format(pooling)
 
-    y = Dense(1, activation='sigmoid')(y)
+    y = Dense(1, activation='sigmoid', kernel_regularizer=regularizers.l2(kernel_l2_regularization))(y)
 
     model = Model(doc_input, y)
     model.summary() # TODO print into file
@@ -135,7 +136,7 @@ def load_data(datapath, indexpath, embeddingspath, testdata=False):
 
 
 
-def run_experiments(finetune, filter_lengths, nb_filter, lr, pooling, other_params):
+def run_experiments(finetune, filter_lengths, nb_filter, lr, pooling, kernel_l2_regularization, other_params):
     assert (type(other_params)), type(other_params)
     global embeddings_matrix, X_train, y_train, X_validate, y_validate, X_test, y_test
 
@@ -144,7 +145,8 @@ def run_experiments(finetune, filter_lengths, nb_filter, lr, pooling, other_para
     model, params = get_model(
         maxlen=maxlen, dimensions=dimensions, finetune=finetune, vocab_size=vocab_size,
         filter_lengths = filter_lengths, nb_filter = nb_filter, weights=[embeddings_matrix],
-        dropout_rate=0.5, lr=lr, pooling=pooling)
+        dropout_rate=0.5, kernel_l2_regularization=kernel_l2_regularization,
+        lr=lr, pooling=pooling)
     params = add_defaults(params, other_params)
     # TODO add other params here params['embeddingspath'] = 
 
@@ -163,7 +165,7 @@ def run_experiments(finetune, filter_lengths, nb_filter, lr, pooling, other_para
             model.summary()
         sys.stdout = stdout
 
-        plot_model(model, to_file=a.getFilePath('model.png'), show_shapes=True, show_layer_names=True)
+        # plot_model(model, to_file=a.getFilePath('model.png'), show_shapes=True, show_layer_names=True)
 
         modelpath = temp.getFilePath('weights.hdf5')
         callbacks = [
@@ -171,7 +173,7 @@ def run_experiments(finetune, filter_lengths, nb_filter, lr, pooling, other_para
             ModelCheckpoint(modelpath, monitor='val_acc',
                 save_best_only=True, verbose=0),
         ]
-        h = model.fit(X_train, y_train, batch_size=256, nb_epoch=3000,
+        h = model.fit(X_train, y_train, batch_size=256, nb_epoch=3000, verbose=0,
             validation_data=(X_validate, y_validate), callbacks=callbacks)
 
         save_history(h, a.getDirPath())
@@ -179,25 +181,6 @@ def run_experiments(finetune, filter_lengths, nb_filter, lr, pooling, other_para
     return
 
 def main():
-    experiment_id = 0
-    experiments_to_run = map(int, sys.argv[1:])
-    datapath = '/tmp/yo/foodborne/yelp_labelled.csv'
-    indexpath = '/tmp/yo/foodborne/vocab_yelp.txt'
-    for embeddingspath in ('/tmp/yo/foodborne/vectors_yelp_2.txt', '/tmp/yo/foodborne/vectors_yelp.txt'):
-        load_data(datapath, indexpath, embeddingspath, testdata=False)
-        for nb_filter in (5,10,25,50):
-            lr = 1e-3
-            for pooling in ['logsumexp']:
-                for filter_lengths_size in [3]:
-                    filter_lengths = tuple((x+1 for x in range(filter_lengths_size)))
-                    if(experiment_id in experiments_to_run):
-                      try:
-                        logging.info('running experiment_id: {}'.format(experiment_id))
-                        run_experiments(finetune=False, filter_lengths=filter_lengths,
-                            nb_filter=nb_filter, lr=lr, pooling=pooling, other_params={'embeddingspath':embeddingspath})
-                      except Exception as e:
-                        logging.exception(e)
-                    experiment_id += 1
     return
 
 if __name__ == '__main__':
