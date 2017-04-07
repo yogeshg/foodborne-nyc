@@ -8,7 +8,7 @@ logging.basicConfig(level = logging.INFO, format=
 
 from keras.preprocessing import sequence
 from keras.models import Model, Sequential
-from keras.layers import Input, Dense, Embedding, GlobalMaxPooling1D, Convolution1D, merge, Dropout
+from keras.layers import Input, Dense, Embedding, GlobalMaxPooling1D, GlobalAveragePooling1D, Convolution1D, merge, Dropout
 from keras import regularizers
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras.utils import plot_model
@@ -72,7 +72,7 @@ def get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000,
     assert(type(maxlen)==int), type(maxlen)
     assert(type(finetune)==bool), type(finetune)
     assert(type(vocab_size)==int), type(vocab_size)
-    assert(pooling in ['max', 'average', 'logsumexp']), '{} not in {}'.format(str(pooling), str(['max', 'average', 'logsumexp']))
+    assert(pooling in ['max', 'avg', 'logsumexp']), '{} not in {}'.format(str(pooling), str(['max', 'average', 'logsumexp']))
     assert (all([x in (1,2,3) for x in filter_lengths])), '{} not in {}'.format(str(filter_lengths), str((1,2,3)))
     assert (type(nb_filter)==int), type(nb_filter)
     params = {k:v for k,v in locals().iteritems() if k!='weights'}
@@ -85,6 +85,8 @@ def get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000,
     y = get_conv_stack(y, nb_filter, filter_lengths, 'relu', dropout_rate, kernel_l2_regularization)
     if(pooling=='max'):
         y = GlobalMaxPooling1D()(y)
+    elif(pooling=='avg'):
+        y = GlobalAveragePooling1D()(y)
     elif(pooling=='logsumexp'):
         y = LogSumExpPooling()(y)
     else:
@@ -168,13 +170,18 @@ def run_experiments(finetune, filter_lengths, nb_filter, lr, pooling, kernel_l2_
         # plot_model(model, to_file=a.getFilePath('model.png'), show_shapes=True, show_layer_names=True)
 
         modelpath = temp.getFilePath('weights.hdf5')
+        patience = 500
+        if(pooling=='logsumexp'):
+            patience = 1000
         callbacks = [
-            EarlyStopping(monitor='val_acc', patience=500, verbose=0),
+            EarlyStopping(monitor='val_acc', patience=patience, verbose=0),
             ModelCheckpoint(modelpath, monitor='val_acc',
                 save_best_only=True, verbose=0),
         ]
+        logger.info('starting training')
         h = model.fit(X_train, y_train, batch_size=256, nb_epoch=3000, verbose=0,
             validation_data=(X_validate, y_validate), callbacks=callbacks)
+        logger.info('ending training')
 
         save_history(h, a.getDirPath())
 
