@@ -22,24 +22,7 @@ import csv
 import numpy as np
 import numpy.random as npr
 import pandas as pd
-from sklearn import preprocessing, metrics, cross_validation, grid_search
-from sklearn.externals import joblib
-
-# model components
-from sklearn.pipeline import Pipeline
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.feature_extraction.text import TfidfTransformer
-from sklearn.svm import SVC
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.tree import DecisionTreeClassifier
-
-# plots
-from matplotlib import pyplot as plt
-#get_ipython().magic(u'matplotlib inline')
-import seaborn as sb
-sb.set_color_codes()
-
+from sklearn import cross_validation
 
 # # Data Preprocessing
 # 
