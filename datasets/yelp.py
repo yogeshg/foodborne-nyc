@@ -203,7 +203,7 @@ class LoaderOfficial():
             X = []
             maxlen_data = 0
             for data in data_x: 
-                tokens = self.pp.get_tokens(data)
+                tokens = self.pp.get_tokens(str(data.astype(str)))
                 try:
                     index_vectors = [self.indexer.get_index(x) for x in tokens]
                     X.append( index_vectors )
@@ -216,6 +216,10 @@ class LoaderOfficial():
         y_train = yelp_official.sick_train['y']
         X_test, maxlen_test = apply_preprocess(yelp_official.sick_test['x'])
         y_test = yelp_official.sick_test['y']
+
+        logging.debug('length of X_train: {}, y_train: {}'.format(len(X_train), len(y_train)))
+        logging.debug('length of X_test: {}, y_test: {}'.format(len(X_test), len(y_test)))
+
         if(maxlen is None):
             maxlen = max(maxlen_train, maxlen_test)
         X_train = sequence.pad_sequences(X_train, maxlen=maxlen)

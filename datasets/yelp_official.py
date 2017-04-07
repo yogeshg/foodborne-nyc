@@ -24,6 +24,10 @@ import numpy.random as npr
 import pandas as pd
 from sklearn import cross_validation
 
+import foodbornenyc.util.util as u
+
+logger = u.get_logger(__name__)
+
 # # Data Preprocessing
 # 
 # `all_data_from_dohmh.xlsx` contains the original annotations from the DOHMH epidemiologists
@@ -52,7 +56,7 @@ labelled_datapath = datadir + 'all_data_from_dohmh.xlsx'
 
 sick_df = pd.read_csv(yelp_sick_datapath)
 mult_df = pd.read_csv(yelp_mult_datapath)
-print len(sick_df), len(mult_df)
+logger.debug('length of sick dataframe: {} and mult: {}'.format(len(sick_df), len(mult_df)))
 
 
 # In[97]:
@@ -76,7 +80,7 @@ for _, row in mult_df.iterrows():
     else:
         pass #print row
     
-print 'Resulting number of reviews after mismatches and duplicates removed: {}'.format(len(all_data))
+logger.info('Resulting number of reviews after mismatches and duplicates removed: {}'.format(len(all_data)))
 
 
 # In[131]:
@@ -91,7 +95,7 @@ mult_data = {'x':np.array(all_data.keys()),
 
 # In[311]:
 
-'{} positive multiple instances'.format(np.sum(mult_data['y']))
+logger.debug('{} positive multiple instances'.format(np.sum(mult_data['y'])))
 
 
 # ### Now split into train and test sets, removing all data from the test sets that could be restaurant-biased. These are reviews that have a parent restaurant which has another review in the train data with the same label
@@ -142,12 +146,12 @@ def split_dev_test(data, test_size=.2):
         test_data = {k:v[good_idxs] for k,v in data.items()}
         
         
-    print "Training/Dev data shape: ", train_data['x'].shape, train_data['y'].shape
-    print "Test data shape: ",test_data['x'].shape, test_data['y'].shape
+    logger.info("Training/Dev data shape, x: {}, y: {} ".format(str(train_data['x'].shape), str(train_data['y'].shape)))
+    logger.info("Test data shape x: {}, y: {} ".format( str(test_data['x'].shape), str(test_data['y'].shape)))
     return train_data, test_data
 
-print "Sick data:"
+logger.info("Preparing Sick data:")
 sick_train, sick_test = split_dev_test(sick_data)
-print "Mult data:"
+logger.info("Preparing Mult data:")
 mult_train, mult_test = split_dev_test(mult_data)
 
