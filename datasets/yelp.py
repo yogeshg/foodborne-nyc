@@ -15,6 +15,14 @@ logging.basicConfig(level = logging.DEBUG, format=
 logger = u.get_logger(__name__)
 
 class Index():
+    '''
+    This class stores the mappings between tokens to index
+    indexpath : where the index file is stored, each line has a word and index
+                line number serves as the index of the word
+    unknown_index : this what we would represent an unknown word as
+    get_index : token (integer) -> index (integer)
+    get_token : index (string) -> token (string)
+    '''
     def __init__(self, indexpath, unknown_index=-1):
         self.index2tokens = []
         self.tokens2index = {}
@@ -38,8 +46,16 @@ class Index():
         else:
             return self.index2tokens[index]
 
-
 class Preprocessor():
+    '''
+    We use spacy to convert words to tokens
+    install spacy and download the data file to ensure this works
+    spacy automatically breaks the words based on punctuations and white spaces
+    right now, we exclude all the punctuations and consider only words
+    datapath : path of the spacy data file
+    get_tokens : 'a string like this' -> ['a', 'string', 'like', 'this']
+    get_preprocessed : "a string that's like this. or this!" -> "a string that 's like this or this"
+    '''
     def __init__(self, datapath='/tmp/yo/.python/spacy/data/'):
         logger.info('loading spacy from file, '+datapath)
         import spacy
@@ -56,6 +72,16 @@ class Preprocessor():
         return line2
 
 class Embeddings():
+    """
+    Deals with the word embeddings
+    embeddingspath : path of the file that stores embeddings
+                     first line contains m  and n separted by space
+                     following m lines each contain token followed by n floats
+    indexer : this is required to map each token to an index
+    embeddings : token -> list of floats, reload() refreshes this
+    get_embeddings : document -> list of embeddings (list of floats)
+    get_embeddings_matrix : list of list of embeddings (list of floats)
+    """
     def __init__(self, embeddingspath, indexer, size=None, vocab_size=None):
         self.embeddingspath = embeddingspath
         self.embeddings = {}
@@ -113,7 +139,17 @@ def cutXY(xy, ratio):
     cut = int(ratio * len(x))
     return ((x[:cut], y[:cut]),(x[cut:], y[cut:]))
 
-class Loader():
+class LoaderOld():
+    '''
+    reads reviews from a filepath, indexes using an indexer
+    filepath : file where reviews are stored, csv file
+                columns are 'data', 'label'
+                each line contains quoted string as data and an integer label
+    indexer : to convert lines (list of tokens) into indexes
+    load_data : reads the csv and converts words to list of indexes into X, y
+                makes into a numpy array if dtype is specified
+                returns training and testing data
+    '''
     def __init__(self, filepath, indexer, preprocessor=None ):
         self.filepath = filepath
         self.pp = preprocessor
@@ -146,13 +182,62 @@ class Loader():
 
         return cutXY((X, y), ratio_dev_test)
 
-def load_devset_testset_index(datapath, indexpath, maxlen=None, dtype=np.float32, ratio_dev_test=0.8):
+class LoaderOfficial():
+    '''
+    reads reviews from the yelp_official module, indexes using an indexer
+    indexer : to convert lines (list of tokens) into indexes
+    load_data : reads the csv and converts words to list of indexes into X, y
+                makes into a numpy array if dtype is specified
+                returns training and testing data
+    '''
+    def __init__(self, indexer, preprocessor=None ):
+        self.pp = preprocessor
+        if( self.pp is None):
+            self.pp = Preprocessor()
+        self.indexer = indexer
+
+    def load_data(self, dtype=None, maxlen=None):
+        logger.info('loading data from yelp_official module')
+        import yelp_official
+        def apply_preprocess(data_x):
+            X = []
+            maxlen_data = 0
+            for data in data_x: 
+                tokens = self.pp.get_tokens(data)
+                try:
+                    index_vectors = [self.indexer.get_index(x) for x in tokens]
+                    X.append( index_vectors )
+                    maxlen_data = max(maxlen_data, len(index_vectors))
+                except Exception as e:
+                    logger.info(str(tokens))
+                    logger.exception(e)
+            return (X, maxlen_data)
+        X_train, maxlen_train = apply_preprocess(yelp_official.sick_train['x'])
+        y_train = yelp_official.sick_train['y']
+        X_test, maxlen_test = apply_preprocess(yelp_official.sick_test['x'])
+        y_test = yelp_official.sick_test['y']
+        if(maxlen is None):
+            maxlen = max(maxlen_train, maxlen_test)
+        X_train = sequence.pad_sequences(X_train, maxlen=maxlen)
+        X_test = sequence.pad_sequences(X_test, maxlen=maxlen)
+
+        if(not dtype is None):
+            X_train = np.array(X_train, dtype=dtype)
+            y_train = np.array(y_train, dtype=dtype)
+            X_test = np.array(X_test, dtype=dtype)
+            y_test = np.array(y_test, dtype=dtype)
+
+        return ((X_train, y_train), (X_test, y_test))
+
+def load_devset_testset_index(datapath, indexpath, maxlen=None, dtype=np.float32):
     logger.debug('loading yelp data and index: '+str(locals()))
+    logger.info('ignoring ' + datapath)
+    global p, i, l
     p = Preprocessor()
     i = Index(indexpath, unknown_index=0)
-    l = Loader(datapath, i, p)
+    l = LoaderOfficial(i, p)
 
-    (devset, testset) = l.load_data(dtype=dtype, ratio_dev_test=ratio_dev_test)
+    (devset, testset) = l.load_data(dtype=dtype)
 
     return (devset, testset, i.index2tokens)
 
