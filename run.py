@@ -3,17 +3,16 @@ from models import *
 def main():
     experiment_id = 0
     experiments_to_run = map(int, sys.argv[1:])
-    datapath = '/tmp/yo/foodborne/yelp_labelled.csv'
     indexpath = '/tmp/yo/foodborne/vocab_yelp.txt'
     embeddingspath  = '/tmp/yo/foodborne/vectors_yelp.txt'
-    load_data(datapath, indexpath, embeddingspath, testdata=False)
+    load_data('None', indexpath, embeddingspath, testdata=False)
     try:
-      for nb_filter in (5,10,25,50):
+      for nb_filter in (5,):
         lr = 1e-3
         pooling = 'max'
         filter_lengths_size = 3
         filter_lengths = tuple((x+1 for x in range(filter_lengths_size)))
-        for kernel_l2_regularization in [0.01, 0.0, 0.001]:
+        for kernel_l2_regularization in [0.01,]:
             if(experiment_id in experiments_to_run):
                 logging.info('running experiment_id: {}'.format(experiment_id))
                 run_experiments(finetune=False, filter_lengths=filter_lengths,

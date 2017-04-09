@@ -44,7 +44,7 @@ class LogSumExpPooling(Layer):
     def compute_output_shape(self, input_shape):
         return input_shape[:1]+input_shape[2:]
 
-def get_conv_stack(input_layer, nb_filter, filter_lengths, activation, dropout_rate, kernel_l2_regularization):
+def get_conv_stack(input_layer, nb_filter, filter_lengths, activation, kernel_l2_regularization):
     layers = [Convolution1D(nb_filter=nb_filter, filter_length=f,
             border_mode='same', activation=activation, kernel_regularizer=regularizers.l2(kernel_l2_regularization),
             subsample_length=1)(input_layer) for f in filter_lengths]
@@ -53,7 +53,7 @@ def get_conv_stack(input_layer, nb_filter, filter_lengths, activation, dropout_r
     elif (len(layers) == 1):
         return layers[0]
     else:
-        return Dropout(dropout_rate, noise_shape=None, seed=None)(merge(layers, mode='concat'))
+        return merge(layers, mode='concat')
 
 def get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000,
             pooling='max', filter_lengths=(), nb_filter=0, weights=None,
@@ -82,7 +82,8 @@ def get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000,
     doc_input = Input(shape=(maxlen,), dtype='int32')
     embedding_layer = Embedding(vocab_size, dimensions, weights=weights, input_length=maxlen, trainable=finetune)
     y = embedding_layer(doc_input)
-    y = get_conv_stack(y, nb_filter, filter_lengths, 'relu', dropout_rate, kernel_l2_regularization)
+    y = Dropout(dropout_rate, noise_shape=None, seed=None)(y)
+    y = get_conv_stack(y, nb_filter, filter_lengths, 'relu', kernel_l2_regularization)
     if(pooling=='max'):
         y = GlobalMaxPooling1D()(y)
     elif(pooling=='avg'):
@@ -129,7 +130,7 @@ def load_data(datapath, indexpath, embeddingspath, testdata=False):
         embeddingspath = '/tmp/yo/foodborne/vectors_yelp_sample.txt'
     
     embeddings_matrix = yelp.load_embeddings_matrix(indexpath, embeddingspath)
-    ((X, y), (X_test, y_test), _) = yelp.load_devset_testset_index(datapath, indexpath, ratio_dev_test=0.8)
+    ((X, y), (X_test, y_test), _) = yelp.load_devset_testset_index(datapath, indexpath)
     ratio_train_validate = 0.8
     ((X_train, y_train), (X_validate, y_validate)) = yelp.cutXY((X, y), ratio_train_validate)
 
@@ -179,7 +180,7 @@ def run_experiments(finetune, filter_lengths, nb_filter, lr, pooling, kernel_l2_
                 save_best_only=True, verbose=0),
         ]
         logger.info('starting training')
-        h = model.fit(X_train, y_train, batch_size=256, nb_epoch=3000, verbose=0,
+        h = model.fit(X_train, y_train, batch_size=256, nb_epoch=300, verbose=0,
             validation_data=(X_validate, y_validate), callbacks=callbacks)
         logger.info('ending training')
 
