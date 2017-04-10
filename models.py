@@ -17,8 +17,9 @@ from keras.engine.topology import Layer
 from keras import backend as K
 import tensorflow as tf
 from datasets import yelp
+from metrics import auc
 
-from archiver import get_archiver
+from util.archiver import get_archiver
 
 import json
 import pandas as pd
@@ -98,9 +99,21 @@ def get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000,
     model = Model(doc_input, y)
     model.summary() # TODO print into file
     adam = Adam(lr=lr, beta_1=beta_1, beta_2=beta_2, epsilon=epsilon, decay=decay)
-    model.compile(loss='binary_crossentropy', optimizer=adam, metrics=['accuracy'])
+    model.compile(loss='binary_crossentropy', optimizer=adam, metrics=['accuracy', auc])
 
     return (model, params)
+
+def plot_metric(df, metric_name, i, dirpath):
+    assert(type(df) == pd.DataFrame, type(df))
+    assert(type(metric_name) == str, type(metric_name))
+    assert(type(i) == int)
+    assert(type(dirpath) == str)
+    val_metric = 'val_{}'.format(metric_name)
+    cname = 'val_{}_{:04d}'.format(metric_name, i)
+    df.loc[:, cname] = df.loc[i, val_metric]
+    df.loc[:, [metric_name, val_metric, cname]].plot()
+    plot.savefig(dirpath + '/{}.png'.format(metric_name))
+    return
 
 def save_history(history, dirpath):
     with open(dirpath+'/training.json', 'w') as f:
@@ -110,15 +123,9 @@ def save_history(history, dirpath):
     df.to_csv(dirpath+'/history.csv')
     i = df.val_acc.argmax()
 
-    cname = 'val_acc_{:04d}'.format(i)
-    df.loc[:, cname] = df.loc[i,'val_acc']
-    df.loc[:, ['acc', 'val_acc', cname]].plot()
-    plt.savefig(dirpath+'/acc.png')
-
-    cname = 'val_loss_{:04d}'.format(i)
-    df.loc[:, cname] = df.loc[i,'val_loss']
-    df.loc[:, ['loss', 'val_loss', cname]].plot()
-    plt.savefig(dirpath+'/loss.png')
+    plot_metric(df, 'auc', i, dirpath)
+    plot_metric(df, 'acc', i, dirpath)
+    plot_metric(df, 'loss', i, dirpath)
 
     return
 
@@ -171,16 +178,14 @@ def run_experiments(finetune, filter_lengths, nb_filter, lr, pooling, kernel_l2_
         # plot_model(model, to_file=a.getFilePath('model.png'), show_shapes=True, show_layer_names=True)
 
         modelpath = temp.getFilePath('weights.hdf5')
-        patience = 500
-        if(pooling=='logsumexp'):
-            patience = 1000
+        patience = 50
         callbacks = [
             EarlyStopping(monitor='val_acc', patience=patience, verbose=0),
             ModelCheckpoint(modelpath, monitor='val_acc',
                 save_best_only=True, verbose=0),
         ]
         logger.info('starting training')
-        h = model.fit(X_train, y_train, batch_size=256, nb_epoch=300, verbose=0,
+        h = model.fit(X_train, y_train, batch_size=256, nb_epoch=500, verbose=0,
             validation_data=(X_validate, y_validate), callbacks=callbacks)
         logger.info('ending training')
 
