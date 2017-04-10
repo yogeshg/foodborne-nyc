@@ -2,6 +2,8 @@ import numpy as np
 from keras import backend as K
 import tensorflow as tf
 
+# Thanks to issacgerg on https://github.com/fchollet/keras/issues/3230
+
 #-----------------------------------------------------------------------------------------------------------------------------------------------------
 # AUC for a binary classifier
 def auc(y_true, y_pred):   

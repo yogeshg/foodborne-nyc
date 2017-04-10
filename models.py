@@ -106,10 +106,10 @@ def get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000,
     return (model, params)
 
 def plot_metric(df, metric_name, i, dirpath):
-    assert(type(df) == pd.DataFrame, type(df))
-    assert(type(metric_name) == str, type(metric_name))
-    assert(type(i) == int)
-    assert(type(dirpath) == str)
+    assert type(df) == pd.DataFrame, type(df)
+    assert type(metric_name) == str, type(metric_name)
+    assert type(i) == int, i
+    assert type(dirpath) == str, dirpath
     val_metric = 'val_{}'.format(metric_name)
     cname = 'val_{}_{:04d}'.format(metric_name, i)
     df.loc[:, cname] = df.loc[i, val_metric]
@@ -117,7 +117,8 @@ def plot_metric(df, metric_name, i, dirpath):
     plt.savefig(dirpath + '/{}.png'.format(metric_name))
     return
 
-def plot_model(*args, **kwargs)
+def plot_model(*args, **kwargs):
+    output = None
     try:
         output = keras.utils.plot_model(*args, **kwargs)
     except Exception as e:
@@ -132,30 +133,30 @@ def save_history(history, dirpath):
     df.to_csv(dirpath+'/history.csv')
     i = df.loc[:, c.monitor].argmax()
 
-    for m in c.metrics+['acc']:
+    for m in c.metrics + ['loss']:
         plot_metric(df, m, i, dirpath)
 
     return
 
 def load_data(datapath, indexpath, embeddingspath, testdata=False):
-    global embeddings_matrix, X_train, y_train, X_validate, y_validate, X_test, y_test
+    global embeddings_matrix, X_train, y_train, X_test, y_test
     if( testdata ):
         datapath = '/tmp/yo/foodborne/yelp_labelled_sample.csv'
         indexpath = '/tmp/yo/foodborne/vocab_yelp_sample.txt'
         embeddingspath = '/tmp/yo/foodborne/vectors_yelp_sample.txt'
     
     embeddings_matrix = yelp.load_embeddings_matrix(indexpath, embeddingspath)
-    ((X, y), (X_test, y_test), _) = yelp.load_devset_testset_index(datapath, indexpath)
-    ratio_train_validate = 0.8
-    # TODO remove this ration from here and add directly to model.fit
-    ((X_train, y_train), (X_validate, y_validate)) = yelp.cutXY((X, y), ratio_train_validate)
+    ((X_train, y_train), (X_test, y_test), _) = yelp.load_devset_testset_index(datapath, indexpath)
+    # ratio_train_validate = 0.8
+    # # TODO remove this ration from here and add directly to model.fit
+    # ((X_train, y_train), (X_validate, y_validate)) = yelp.cutXY((X, y), ratio_train_validate)
 
-    for x in (X_train, y_train, X_validate, y_validate, X_test, y_test):
+    for x in (X_train, y_train, X_test, y_test):
         logger.debug("shape and info: "+str((x.shape, x.max(), x.min())))
 
 def run_experiments(finetune, filter_lengths, nb_filter, lr, pooling, kernel_l2_regularization, other_params):
     assert (type(other_params)), type(other_params)
-    global embeddings_matrix, X_train, y_train, X_validate, y_validate, X_test, y_test
+    global embeddings_matrix, X_train, y_train, X_test, y_test
 
     maxlen = X_train.shape[1]
     (vocab_size, dimensions) = embeddings_matrix.shape
@@ -185,11 +186,11 @@ def run_experiments(finetune, filter_lengths, nb_filter, lr, pooling, kernel_l2_
         plot_model(model, to_file=a.getFilePath('model.png'), show_shapes=True, show_layer_names=True)
 
         modelpath = temp.getFilePath('weights.hdf5')
-        earlystopping = EarlyStopping(monitor=c.monitor, patience=c.patience, verbose=0),
-        modelcheckpoint = ModelCheckpoint(modelpath, monitor=c.monitor, save_best_only=True, verbose=0),
+        earlystopping = EarlyStopping(monitor=c.monitor, patience=c.patience, verbose=0)
+        modelcheckpoint = ModelCheckpoint(modelpath, monitor=c.monitor, save_best_only=True, verbose=0)
         logger.info('starting training')
         h = model.fit(X_train, y_train, batch_size=c.batch_size, epochs=c.epochs, verbose=0,
-            validation_data=(X_validate, y_validate), callbacks=[earlystopping, modelcheckpoint])
+            validation_split=0.2, callbacks=[earlystopping, modelcheckpoint])
         logger.info('ending training')
 
         save_history(h, a.getDirPath())
