@@ -19,6 +19,7 @@ import tensorflow as tf
 from datasets import yelp
 from metrics import auc
 
+import util
 from util.archiver import get_archiver
 
 import json
@@ -26,10 +27,10 @@ import pandas as pd
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import config as c
 
 logger = u.get_logger(__name__)
 
-import config as c
 
 def add_defaults(d1, d2):
      d22 = dict(d2)
@@ -155,7 +156,8 @@ def load_data(datapath, indexpath, embeddingspath, testdata=False):
         logger.debug("shape and info: "+str((x.shape, x.max(), x.min())))
 
 def run_experiments(finetune, filter_lengths, nb_filter, lr, pooling, kernel_l2_regularization, other_params):
-    assert (type(other_params)), type(other_params)
+    commit_hash = util.save_code()
+    other_params['commit_hash'] = commit_hash
     global embeddings_matrix, X_train, y_train, X_test, y_test
 
     maxlen = X_train.shape[1]
