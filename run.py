@@ -9,7 +9,7 @@ def main():
     try:
       for nb_filter in (5,):
         lr = 1e-3
-        pooling = 'max'
+        pooling = 'logsumexp'
         filter_lengths_size = 3
         filter_lengths = tuple((x+1 for x in range(filter_lengths_size)))
         for kernel_l2_regularization in [0.01,]:

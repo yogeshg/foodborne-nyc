@@ -15,6 +15,7 @@ from keras.utils import plot_model
 from keras.optimizers import Adam
 from keras.engine.topology import Layer
 from keras import backend as K
+import tensorflow as tf
 from datasets import yelp
 
 from archiver import get_archiver
@@ -38,8 +39,7 @@ class LogSumExpPooling(Layer):
 
     def call(self, x):
         # could be axis 0 or 1
-        import numpy as np
-        return K.log(K.sum(K.exp(x), axis=1))
+        return tf.reduce_logsumexp(x, axis=1)
 
     def compute_output_shape(self, input_shape):
         return input_shape[:1]+input_shape[2:]
