@@ -11,7 +11,7 @@ from keras.models import Model, Sequential
 from keras.layers import Input, Dense, Embedding, GlobalMaxPooling1D, GlobalAveragePooling1D, Convolution1D, merge, Dropout
 from keras import regularizers
 from keras.callbacks import EarlyStopping, ModelCheckpoint
-from keras.utils import plot_model
+import keras.utils
 from keras.optimizers import Adam
 from keras.engine.topology import Layer
 from keras import backend as K
@@ -28,6 +28,8 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 logger = u.get_logger(__name__)
+
+import config as c
 
 def add_defaults(d1, d2):
      d22 = dict(d2)
@@ -112,8 +114,15 @@ def plot_metric(df, metric_name, i, dirpath):
     cname = 'val_{}_{:04d}'.format(metric_name, i)
     df.loc[:, cname] = df.loc[i, val_metric]
     df.loc[:, [metric_name, val_metric, cname]].plot()
-    plot.savefig(dirpath + '/{}.png'.format(metric_name))
+    plt.savefig(dirpath + '/{}.png'.format(metric_name))
     return
+
+def plot_model(*args, **kwargs)
+    try:
+        output = keras.utils.plot_model(*args, **kwargs)
+    except Exception as e:
+        logger.exception(e)
+    return output
 
 def save_history(history, dirpath):
     with open(dirpath+'/training.json', 'w') as f:
@@ -121,11 +130,10 @@ def save_history(history, dirpath):
 
     df = pd.DataFrame.from_dict(history.history)
     df.to_csv(dirpath+'/history.csv')
-    i = df.val_acc.argmax()
+    i = df.loc[:, c.monitor].argmax()
 
-    plot_metric(df, 'auc', i, dirpath)
-    plot_metric(df, 'acc', i, dirpath)
-    plot_metric(df, 'loss', i, dirpath)
+    for m in c.metrics+['acc']:
+        plot_metric(df, m, i, dirpath)
 
     return
 
@@ -139,12 +147,11 @@ def load_data(datapath, indexpath, embeddingspath, testdata=False):
     embeddings_matrix = yelp.load_embeddings_matrix(indexpath, embeddingspath)
     ((X, y), (X_test, y_test), _) = yelp.load_devset_testset_index(datapath, indexpath)
     ratio_train_validate = 0.8
+    # TODO remove this ration from here and add directly to model.fit
     ((X_train, y_train), (X_validate, y_validate)) = yelp.cutXY((X, y), ratio_train_validate)
 
     for x in (X_train, y_train, X_validate, y_validate, X_test, y_test):
         logger.debug("shape and info: "+str((x.shape, x.max(), x.min())))
-
-
 
 def run_experiments(finetune, filter_lengths, nb_filter, lr, pooling, kernel_l2_regularization, other_params):
     assert (type(other_params)), type(other_params)
@@ -175,27 +182,17 @@ def run_experiments(finetune, filter_lengths, nb_filter, lr, pooling, kernel_l2_
             model.summary()
         sys.stdout = stdout
 
-        # plot_model(model, to_file=a.getFilePath('model.png'), show_shapes=True, show_layer_names=True)
+        plot_model(model, to_file=a.getFilePath('model.png'), show_shapes=True, show_layer_names=True)
 
         modelpath = temp.getFilePath('weights.hdf5')
-        patience = 50
-        callbacks = [
-            EarlyStopping(monitor='val_acc', patience=patience, verbose=0),
-            ModelCheckpoint(modelpath, monitor='val_acc',
-                save_best_only=True, verbose=0),
-        ]
+        earlystopping = EarlyStopping(monitor=c.monitor, patience=c.patience, verbose=0),
+        modelcheckpoint = ModelCheckpoint(modelpath, monitor=c.monitor, save_best_only=True, verbose=0),
         logger.info('starting training')
-        h = model.fit(X_train, y_train, batch_size=256, nb_epoch=500, verbose=0,
-            validation_data=(X_validate, y_validate), callbacks=callbacks)
+        h = model.fit(X_train, y_train, batch_size=c.batch_size, epochs=c.epochs, verbose=0,
+            validation_data=(X_validate, y_validate), callbacks=[earlystopping, modelcheckpoint])
         logger.info('ending training')
 
         save_history(h, a.getDirPath())
 
     return
-
-def main():
-    return
-
-if __name__ == '__main__':
-    main()
 
