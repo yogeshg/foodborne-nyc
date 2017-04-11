@@ -188,7 +188,7 @@ def run_experiments(finetune, kernel_sizes, filters, lr, pooling, kernel_l2_regu
         plot_model(model, to_file=a.getFilePath('model.png'), show_shapes=True, show_layer_names=True)
 
         modelpath = temp.getFilePath('weights.hdf5')
-        earlystopping = EarlyStopping(monitor=c.monitor, patience=c.patience, verbose=0)
+        earlystopping = EarlyStopping(monitor=c.monitor, patience=c.patience, verbose=0, mode=c.monitor_objective)
         modelcheckpoint = ModelCheckpoint(modelpath, monitor=c.monitor, save_best_only=True, verbose=0)
         logger.info('starting training')
         h = model.fit(X_train, y_train, batch_size=c.batch_size, epochs=c.epochs, verbose=0,
