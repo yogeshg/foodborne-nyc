@@ -31,6 +31,7 @@ import matplotlib.pyplot as plt
 import config as c
 
 logger = u.get_logger(__name__)
+commit_hash = util.save_code()
 
 
 def add_defaults(d1, d2):
@@ -81,7 +82,7 @@ def get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000,
     assert (type(filters)==int), type(filters)
     params = {k:v for k,v in locals().iteritems() if k!='weights'}
 
-    print params # TODO print into file
+    logger.info( str(params) )
 
     doc_input = Input(shape=(maxlen,), dtype='int32')
     embedding_layer = Embedding(vocab_size, dimensions, weights=weights, input_length=maxlen, trainable=finetune)
@@ -100,7 +101,7 @@ def get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000,
     y = Dense(1, activation='sigmoid', kernel_regularizer=regularizers.l2(kernel_l2_regularization))(y)
 
     model = Model(doc_input, y)
-    model.summary() # TODO print into file
+    model.summary()
     adam = Adam(lr=lr, beta_1=beta_1, beta_2=beta_2, epsilon=epsilon, decay=decay)
     model.compile(loss='binary_crossentropy', optimizer=adam, metrics=['accuracy', auc])
 
@@ -148,17 +149,13 @@ def load_data(datapath, indexpath, embeddingspath, testdata=False):
     
     embeddings_matrix = yelp.load_embeddings_matrix(indexpath, embeddingspath)
     ((X_train, y_train), (X_test, y_test), _) = yelp.load_devset_testset_index(datapath, indexpath)
-    # ratio_train_validate = 0.8
-    # # TODO remove this ration from here and add directly to model.fit
-    # ((X_train, y_train), (X_validate, y_validate)) = yelp.cutXY((X, y), ratio_train_validate)
 
     for x in (X_train, y_train, X_test, y_test):
         logger.debug("shape and info: "+str((x.shape, x.max(), x.min())))
 
 def run_experiments(finetune, kernel_sizes, filters, lr, pooling, kernel_l2_regularization, other_params):
-    commit_hash = util.save_code()
-    other_params['commit_hash'] = commit_hash
     global embeddings_matrix, X_train, y_train, X_test, y_test
+    other_params['commit_hash'] = commit_hash
 
     maxlen = X_train.shape[1]
     (vocab_size, dimensions) = embeddings_matrix.shape
@@ -168,11 +165,9 @@ def run_experiments(finetune, kernel_sizes, filters, lr, pooling, kernel_l2_regu
         dropout_rate=0.5, kernel_l2_regularization=kernel_l2_regularization,
         lr=lr, pooling=pooling)
     params = add_defaults(params, other_params)
-    # TODO add other params here params['embeddingspath'] = 
 
     results_dir = '/tmp/yo/foodborne/results/test/'
     with get_archiver(datadir='/tmp/yo/foodborne/results') as temp, get_archiver() as a:
-    # with get_archiver() as a:
 
         with open(a.getFilePath('hyperparameters.json'), 'w') as f:
             json.dump(params, f, indent=2)
