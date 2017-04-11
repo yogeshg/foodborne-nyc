@@ -8,7 +8,7 @@ logging.basicConfig(level = logging.INFO, format=
 
 from keras.preprocessing import sequence
 from keras.models import Model, Sequential
-from keras.layers import Input, Dense, Embedding, GlobalMaxPooling1D, GlobalAveragePooling1D, Convolution1D, Dropout
+from keras.layers import Input, Dense, Embedding, GlobalMaxPooling1D, GlobalAveragePooling1D, Conv1D, Dropout
 from keras.layers import concatenate
 from keras import regularizers
 from keras.callbacks import EarlyStopping, ModelCheckpoint
@@ -49,10 +49,9 @@ class LogSumExpPooling(Layer):
     def compute_output_shape(self, input_shape):
         return input_shape[:1]+input_shape[2:]
 
-def get_conv_stack(input_layer, nb_filter, filter_lengths, activation, kernel_l2_regularization, dropout_rate):
-    layers = [Convolution1D(nb_filter=nb_filter, filter_length=f,
-            border_mode='same', activation=activation, kernel_regularizer=regularizers.l2(kernel_l2_regularization),
-            subsample_length=1)(input_layer) for f in filter_lengths]
+def get_conv_stack(input_layer, filters, kernel_sizes, activation, kernel_l2_regularization, dropout_rate):
+    layers = [Conv1D(activation=activation, padding='same', strides=1, filters=filters, kernel_size = size,
+                kernel_regularizer=regularizers.l2(kernel_l2_regularization))(input_layer) for size in kernel_sizes]
     if (len(layers) <= 0):
         return input_layer
     elif (len(layers) == 1):
@@ -61,7 +60,7 @@ def get_conv_stack(input_layer, nb_filter, filter_lengths, activation, kernel_l2
         return Dropout(dropout_rate, noise_shape=None, seed=None)(concatenate(layers))
 
 def get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000,
-            pooling='max', filter_lengths=(), nb_filter=0, weights=None,
+            pooling='max', kernel_sizes=(), filters=0, weights=None,
             dropout_rate=0, kernel_l2_regularization=0,
             lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0 ):
     '''
@@ -70,16 +69,16 @@ def get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000,
     finetune : [True, False] : weather or not to finetune word emdeddings
     vocab_size : size of the vocabulary, emdeddings layer will be this big
     pooling : ['average', 'logsumexp'] : pooling operation for word vectors in a document
-    filter_lengths : tuple : convolve using unigrams / bigrams / trigrams
-    nb_filter : None or int : number of filters for convolutional layer
+    kernel_sizes : tuple : convolve using unigrams / bigrams / trigrams
+    filters : None or int : number of filters for convolutional layer
     '''
     assert(type(dimensions)==int), type(dimensions)
     assert(type(maxlen)==int), type(maxlen)
     assert(type(finetune)==bool), type(finetune)
     assert(type(vocab_size)==int), type(vocab_size)
     assert(pooling in ['max', 'avg', 'logsumexp']), '{} not in {}'.format(str(pooling), str(['max', 'average', 'logsumexp']))
-    assert (all([x in (1,2,3) for x in filter_lengths])), '{} not in {}'.format(str(filter_lengths), str((1,2,3)))
-    assert (type(nb_filter)==int), type(nb_filter)
+    assert (all([x in (1,2,3) for x in kernel_sizes])), '{} not in {}'.format(str(kernel_sizes), str((1,2,3)))
+    assert (type(filters)==int), type(filters)
     params = {k:v for k,v in locals().iteritems() if k!='weights'}
 
     print params # TODO print into file
@@ -88,7 +87,7 @@ def get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000,
     embedding_layer = Embedding(vocab_size, dimensions, weights=weights, input_length=maxlen, trainable=finetune)
     y = embedding_layer(doc_input)
     y = Dropout(dropout_rate, noise_shape=None, seed=None)(y)
-    y = get_conv_stack(y, nb_filter, filter_lengths, 'relu', kernel_l2_regularization, dropout_rate)
+    y = get_conv_stack(y, filters, kernel_sizes, 'relu', kernel_l2_regularization, dropout_rate)
     if(pooling=='max'):
         y = GlobalMaxPooling1D()(y)
     elif(pooling=='avg'):
@@ -156,7 +155,7 @@ def load_data(datapath, indexpath, embeddingspath, testdata=False):
     for x in (X_train, y_train, X_test, y_test):
         logger.debug("shape and info: "+str((x.shape, x.max(), x.min())))
 
-def run_experiments(finetune, filter_lengths, nb_filter, lr, pooling, kernel_l2_regularization, other_params):
+def run_experiments(finetune, kernel_sizes, filters, lr, pooling, kernel_l2_regularization, other_params):
     commit_hash = util.save_code()
     other_params['commit_hash'] = commit_hash
     global embeddings_matrix, X_train, y_train, X_test, y_test
@@ -165,7 +164,7 @@ def run_experiments(finetune, filter_lengths, nb_filter, lr, pooling, kernel_l2_
     (vocab_size, dimensions) = embeddings_matrix.shape
     model, params = get_model(
         maxlen=maxlen, dimensions=dimensions, finetune=finetune, vocab_size=vocab_size,
-        filter_lengths = filter_lengths, nb_filter = nb_filter, weights=[embeddings_matrix],
+        kernel_sizes = kernel_sizes, filters = filters, weights=[embeddings_matrix],
         dropout_rate=0.5, kernel_l2_regularization=kernel_l2_regularization,
         lr=lr, pooling=pooling)
     params = add_defaults(params, other_params)
