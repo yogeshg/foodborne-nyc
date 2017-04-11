@@ -1,28 +1,18 @@
 from models import *
 
 def main():
-    experiment_id = 0
-    experiments_to_run = map(int, sys.argv[1:])
     datapath = '/tmp/yo/foodborne/yelp_labelled.csv'
     indexpath = '/tmp/yo/foodborne/vocab_yelp.txt'
     embeddingspath  = '/tmp/yo/foodborne/vectors_yelp.txt'
     load_data(datapath, indexpath, embeddingspath, testdata=False)
-    try:
-      for filters in (5,10,25,50):
-        lr = 1e-3
-        for pooling in ['max', 'avg', 'logsumexp']:
-            kernel_sizes_size = 3
-            kernel_sizes = tuple((x+1 for x in range(kernel_sizes_size)))
-            for kernel_l2_regularization in [0.001, 0.0]:
-                if(experiment_id in experiments_to_run):
-                    logging.info('running experiment_id: {}'.format(experiment_id))
-                    run_experiments(finetune=False, kernel_sizes=kernel_sizes,
-                        filters=filters, lr=lr, pooling=pooling, kernel_l2_regularization=kernel_l2_regularization,
-                        other_params={'embeddingspath':embeddingspath})
-                experiment_id += 1
-    except Exception as e:
-        logging.exception(e)
-    return
+    other_params = {'embeddingspath':embeddingspath}
+    run_experiments(finetune=False, kernel_sizes=(1,2,3), filters=5, lr=1e-3, pooling='max', kernel_l2_regularization=0.0, other_params=other_params)
+    run_experiments(finetune=False, kernel_sizes=(1,2,3), filters=5, lr=1e-3, pooling='max', kernel_l2_regularization=0.01, other_params=other_params)
+    run_experiments(finetune=False, kernel_sizes=(1,2,3), filters=5, lr=1e-3, pooling='max', kernel_l2_regularization=0.001, other_params=other_params)
+
+    run_experiments(finetune=False, kernel_sizes=(1,2,3), filters=25, lr=1e-3, pooling='max', kernel_l2_regularization=0.0, other_params=other_params)
+    run_experiments(finetune=False, kernel_sizes=(1,2,3), filters=25, lr=1e-3, pooling='max', kernel_l2_regularization=0.01, other_params=other_params)
+    run_experiments(finetune=False, kernel_sizes=(1,2,3), filters=25, lr=1e-3, pooling='max', kernel_l2_regularization=0.001, other_params=other_params)
 
 if __name__ == '__main__':
     main()
