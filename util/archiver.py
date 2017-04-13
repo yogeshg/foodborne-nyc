@@ -5,6 +5,7 @@ import shutil
 import pytz
 import datetime as dt
 from collections import OrderedDict
+import sh
 
 import json
 import logging
@@ -59,6 +60,11 @@ class Archiver(object):
         self.writeInfoFile = writeInfoFile
         self.info = OrderedDict()
         self.info['init'] = getTs()
+        hostname = 'unknown'
+        try:
+            hostname = str(sh.hostname()).strip()
+        self.info['hostname']=hostname
+
         error_message = 'No paths should end in slash'
         assert not '/' in map(lambda x:x[-1], [self.ARCHIVE, self.DATADIR, self.CURRDIR]), error_message
         return
