@@ -78,7 +78,7 @@ def get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000,
     assert(type(finetune)==bool), type(finetune)
     assert(type(vocab_size)==int), type(vocab_size)
     assert(pooling in ['max', 'avg', 'logsumexp']), '{} not in {}'.format(str(pooling), str(['max', 'average', 'logsumexp']))
-    assert (all([x in (1,2,3) for x in kernel_sizes])), '{} not in {}'.format(str(kernel_sizes), str((1,2,3)))
+    assert (all([x in range(10) for x in kernel_sizes])), '{} not in {}'.format(str(kernel_sizes), str((1,2,3)))
     assert (type(filters)==int), type(filters)
     params = {k:v for k,v in locals().iteritems() if k!='weights'}
 
