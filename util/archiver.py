@@ -63,6 +63,8 @@ class Archiver(object):
         hostname = 'unknown'
         try:
             hostname = str(sh.hostname()).strip()
+        except Exception as e:
+            pass
         self.info['hostname']=hostname
 
         error_message = 'No paths should end in slash'
