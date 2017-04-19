@@ -62,7 +62,7 @@ def get_conv_stack(input_layer, filters, kernel_sizes, activation, kernel_l2_reg
 
 def get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000,
             pooling='max', kernel_sizes=(), filters=0, weights=None,
-            dropout_rate=0, kernel_l2_regularization=0, final_layer='sigmoid',
+            dropout_rate=0, kernel_l2_regularization=0,
             lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0 ):
     '''
     maxlen : maximum size of each document
@@ -80,7 +80,6 @@ def get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000,
     assert(pooling in ['max', 'avg', 'logsumexp']), '{} not in {}'.format(str(pooling), str(['max', 'average', 'logsumexp']))
     assert (all([x in range(10) for x in kernel_sizes])), '{} not in {}'.format(str(kernel_sizes), str((1,2,3)))
     assert (type(filters)==int), type(filters)
-    assert (type(final_layer)==str), type(final_layer)
     params = {k:v for k,v in locals().iteritems() if k!='weights'}
 
     logger.info( str(params) )
@@ -99,13 +98,7 @@ def get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000,
     else:
         assert(pooling in ['max', 'logsumexp']), '{} not implemented yet'.format(pooling)
 
-
-    if(final_layer in ('sigmoid', 'softmax')):
-        y = Dense(1, activation=final_layer, kernel_regularizer=regularizers.l2(kernel_l2_regularization))(y)
-    elif(final_layer == 'twoclass_softmax'):
-        y = Dense(2, activation='softmax', kernel_regularizer=regularizers.l2(kernel_l2_regularization))(y)
-    else:
-        raise ValueError('unknown final_layer: '+str(final_layer))
+    y = Dense(1, activation='sigmoid', kernel_regularizer=regularizers.l2(kernel_l2_regularization))(y)
 
     model = Model(doc_input, y)
     model.summary()
@@ -160,7 +153,7 @@ def load_data(datapath, indexpath, embeddingspath, testdata=False):
     for x in (X_train, y_train, X_test, y_test):
         logger.debug("shape and info: "+str((x.shape, x.max(), x.min())))
 
-def run_experiments(finetune, kernel_sizes, filters, lr, pooling, kernel_l2_regularization, final_layer, other_params):
+def run_experiments(finetune, kernel_sizes, filters, lr, pooling, kernel_l2_regularization, other_params):
     global embeddings_matrix, X_train, y_train, X_test, y_test
     other_params['commit_hash'] = commit_hash
 
@@ -168,9 +161,9 @@ def run_experiments(finetune, kernel_sizes, filters, lr, pooling, kernel_l2_regu
     (vocab_size, dimensions) = embeddings_matrix.shape
     model, params = get_model(
         maxlen=maxlen, dimensions=dimensions, finetune=finetune, vocab_size=vocab_size,
-        pooling=pooling, kernel_sizes = kernel_sizes, filters = filters, weights=[embeddings_matrix],
-        dropout_rate=0.5, kernel_l2_regularization=kernel_l2_regularization, final_layer=final_layer,
-        lr=lr )
+        kernel_sizes = kernel_sizes, filters = filters, weights=[embeddings_matrix],
+        dropout_rate=0.5, kernel_l2_regularization=kernel_l2_regularization,
+        lr=lr, pooling=pooling)
     params = add_defaults(params, other_params)
 
     results_dir = '/tmp/yo/foodborne/results/test/'
@@ -191,7 +184,7 @@ def run_experiments(finetune, kernel_sizes, filters, lr, pooling, kernel_l2_regu
 
         modelpath = temp.getFilePath('weights.hdf5')
         earlystopping = EarlyStopping(monitor=c.monitor, patience=c.patience, verbose=0, mode=c.monitor_objective)
-        modelcheckpoint = ModelCheckpoint(modelpath, monitor=c.monitor, save_best_only=True, verbose=0)
+        modelcheckpoint = ModelCheckpoint(modelpath, monitor=c.monitor, save_best_only=True, verbose=0, mode=c.monitor_objective)
         logger.info('starting training')
         h = model.fit(X_train, y_train, batch_size=c.batch_size, epochs=c.epochs, verbose=0,
             validation_split=0.2, callbacks=[earlystopping, modelcheckpoint])
