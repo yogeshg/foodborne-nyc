@@ -33,7 +33,7 @@ import config as c
 logger = u.get_logger(__name__)
 commit_hash = util.save_code()
 
-
+# util
 def add_defaults(d1, d2):
      d22 = dict(d2)
      d11 = dict(d1)
@@ -41,6 +41,7 @@ def add_defaults(d1, d2):
      d11.update(d22)
      return d11
 
+# layers
 class LogSumExpPooling(Layer):
 
     def call(self, x):
@@ -50,6 +51,7 @@ class LogSumExpPooling(Layer):
     def compute_output_shape(self, input_shape):
         return input_shape[:1]+input_shape[2:]
 
+# layers
 def get_conv_stack(input_layer, filters, kernel_sizes, activation, kernel_l2_regularization, dropout_rate):
     layers = [Conv1D(activation=activation, padding='same', strides=1, filters=filters, kernel_size = size,
                 kernel_regularizer=regularizers.l2(kernel_l2_regularization))(input_layer) for size in kernel_sizes]
@@ -60,6 +62,7 @@ def get_conv_stack(input_layer, filters, kernel_sizes, activation, kernel_l2_reg
     else:
         return Dropout(dropout_rate, noise_shape=None, seed=None)(concatenate(layers))
 
+# models
 def get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000,
             pooling='max', kernel_sizes=(), filters=0, weights=None,
             dropout_rate=0, kernel_l2_regularization=0,
@@ -107,6 +110,7 @@ def get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000,
 
     return (model, params)
 
+# utils
 def plot_metric(df, metric_name, i, dirpath):
     assert type(df) == pd.DataFrame, type(df)
     assert type(metric_name) == str, type(metric_name)
@@ -119,6 +123,7 @@ def plot_metric(df, metric_name, i, dirpath):
     plt.savefig(dirpath + '/{}.png'.format(metric_name))
     return
 
+# utils
 def plot_model(*args, **kwargs):
     output = None
     try:
@@ -127,6 +132,7 @@ def plot_model(*args, **kwargs):
         logger.exception(e)
     return output
 
+# replace saving the dataframe with csvlogger callback
 def save_history(history, dirpath):
     with open(dirpath+'/training.json', 'w') as f:
         json.dump(history.params, f, indent=2)
@@ -140,6 +146,7 @@ def save_history(history, dirpath):
 
     return
 
+# main
 def load_data(datapath, indexpath, embeddingspath, testdata=False):
     global embeddings_matrix, X_train, y_train, X_test, y_test
     if( testdata ):
@@ -153,6 +160,7 @@ def load_data(datapath, indexpath, embeddingspath, testdata=False):
     for x in (X_train, y_train, X_test, y_test):
         logger.debug("shape and info: "+str((x.shape, x.max(), x.min())))
 
+# main
 def run_experiments(finetune, kernel_sizes, filters, lr, pooling, kernel_l2_regularization, other_params):
     global embeddings_matrix, X_train, y_train, X_test, y_test
     other_params['commit_hash'] = commit_hash
