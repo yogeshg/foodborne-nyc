@@ -3,6 +3,7 @@ import numpy as np
 # import spacy
 from keras.preprocessing import sequence
 import logging
+import util
 
 logger = logging.getLogger(__name__)
 
@@ -55,12 +56,12 @@ class Preprocessor():
         self.sp = spacy.load('en')
 
     def get_tokens(self, line):
-        tokens = [x.text for x in self.sp(u.xuni(line)) if x.pos_!='PUNCT']
+        tokens = [x.text for x in self.sp(util.xuni(line)) if x.pos_!='PUNCT']
         return tokens
 
     def get_preprocessed(self, line):
         tokens = self.get_tokens(line)
-        line2 = u.xuni(" ".join(tokens))
+        line2 = util.xuni(" ".join(tokens))
         return line2
 
 class Embeddings():

@@ -1,7 +1,7 @@
 import logging
 logging.basicConfig(level = logging.INFO, format=
         '%(asctime)s:%(levelname)s:%(name)s:%(threadName)s:line %(lineno)d: %(message)s')
-logger = logging.get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 import sys
 import json
@@ -17,6 +17,7 @@ from util.archiver import get_archiver
 import config as c
 
 from keras.models import Model
+from keras.callbacks import EarlyStopping, ModelCheckpoint, CSVLogger
 from datasets import yelp
 from models import get_model
 
@@ -49,7 +50,7 @@ def save_model(hyperparams, model, get_filename):
     '''
     util.assert_type(hyperparams, dict)
     util.assert_type(hyperparams, Model)
-    assert(callable(get_filename), 'takes in a filename and retuns saveable path')
+    assert callable(get_filename), 'takes in a filename and retuns saveable path'
 
     with open(get_filename('hyperparameters.json'), 'w') as f:
         json.dump(hyperparams, f, indent=2)

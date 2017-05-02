@@ -1,4 +1,7 @@
-from keras.layers import Conv1D, Dropout, concatenate
+from keras.layers import Layer, Conv1D, Dropout, concatenate
+from keras import regularizers
+import tensorflow as tf
+import keras.backend as K
 
 # layers
 class LogSumExpPooling(Layer):

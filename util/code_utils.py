@@ -1,5 +1,8 @@
 import sh
 
+import logging
+logging.getLogger('sh.command').setLevel(logging.WARNING)
+
 def save_code():
     try:
         o = sh.git.diff('--cached', '--name-only', '--exit-code')

@@ -1,8 +1,10 @@
+import logging
+logger = logging.getLogger(__name__)
+
 from keras.models import Model
-from keras.layers import Input, Dense, Embedding, GlobalMaxPooling1D, GlobalAveragePooling1D
+from keras.layers import Input, Dense, Embedding, Dropout, GlobalMaxPooling1D, GlobalAveragePooling1D
 from layers import LogSumExpPooling, get_conv_stack
 from keras import regularizers
-from keras.callbacks import EarlyStopping, ModelCheckpoint, CSVLogger
 from keras.optimizers import Adam
 
 from metrics import auc

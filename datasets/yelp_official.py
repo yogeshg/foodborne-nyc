@@ -23,10 +23,8 @@ import numpy as np
 import numpy.random as npr
 import pandas as pd
 from sklearn import cross_validation
-
-import foodbornenyc.util.util as u
-
-logger = u.get_logger(__name__)
+import logging
+logger = logging.getLogger(__name__)
 
 # # Data Preprocessing
 # 
