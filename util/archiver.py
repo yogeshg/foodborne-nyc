@@ -11,6 +11,8 @@ import json
 import logging
 logger = logging.getLogger(__name__)
 
+logging.getLogger("sh.command").setLevel(logging.WARNING)
+
 from contextlib import contextmanager
 
 def ensureDir(p):

@@ -1,18 +1,10 @@
-import logging
 import csv
-
 import numpy as np
-
 # import spacy
 from keras.preprocessing import sequence
+import logging
 
-import foodbornenyc.util.util as u
-
-
-logging.basicConfig(level = logging.DEBUG, format=
-        '%(asctime)s:%(levelname)s:%(name)s:%(threadName)s:line %(lineno)d: %(message)s')
-
-logger = u.get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 class Index():
     '''
