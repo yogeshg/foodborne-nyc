@@ -49,7 +49,7 @@ def save_model(hyperparams, model, get_filename):
     get_filename : a function/or lambda that takes in a filename and retuns saveable path
     '''
     util.assert_type(hyperparams, dict)
-    util.assert_type(hyperparams, Model)
+    util.assert_type(model, Model)
     assert callable(get_filename), 'takes in a filename and retuns saveable path'
 
     with open(get_filename('hyperparameters.json'), 'w') as f:

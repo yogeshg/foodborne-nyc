@@ -183,15 +183,20 @@ class LoaderOfficial():
                 makes into a numpy array if dtype is specified
                 returns training and testing data
     '''
-    def __init__(self, indexer, preprocessor=None ):
+    def __init__(self, datapath, indexer, preprocessor=None ):
+        util.assert_in(datapath, ['yelp', 'twitter'])
+        self.datapath = datapath
         self.pp = preprocessor
         if( self.pp is None):
             self.pp = Preprocessor()
         self.indexer = indexer
 
     def load_data(self, dtype=None, maxlen=None):
-        logger.info('loading data from yelp_official module')
-        import yelp_official
+        logger.info('loading data for {}'.format(self.datapath))
+        if(self.datapath == 'yelp'):
+            import yelp_official as data_module
+        elif(self.datapath == 'twitter'):
+            import twitter_official as data_module
         def apply_preprocess(data_x):
             X = []
             maxlen_data = 0
@@ -205,10 +210,10 @@ class LoaderOfficial():
                     logger.info(str(tokens))
                     logger.exception(e)
             return (X, maxlen_data)
-        X_train, maxlen_train = apply_preprocess(yelp_official.sick_train['x'])
-        y_train = yelp_official.sick_train['y']
-        X_test, maxlen_test = apply_preprocess(yelp_official.sick_test['x'])
-        y_test = yelp_official.sick_test['y']
+        X_train, maxlen_train = apply_preprocess(data_module.sick_train['x'])
+        y_train = data_module.sick_train['y']
+        X_test, maxlen_test = apply_preprocess(data_module.sick_test['x'])
+        y_test = data_module.sick_test['y']
 
         logging.debug('length of X_train: {}, y_train: {}'.format(len(X_train), len(y_train)))
         logging.debug('length of X_test: {}, y_test: {}'.format(len(X_test), len(y_test)))
@@ -227,12 +232,13 @@ class LoaderOfficial():
         return ((X_train, y_train), (X_test, y_test))
 
 def load_devset_testset_index(datapath, indexpath, maxlen=None, dtype=np.float32):
-    logger.debug('loading yelp data and index: '+str(locals()))
+    util.assert_type(datapath, str)
+    logger.debug('loading {} data and index: {}'.format(datapath, str(indexpath)))
     logger.info('ignoring ' + datapath)
     global p, i, l
     p = Preprocessor()
     i = Index(indexpath, unknown_index=0)
-    l = LoaderOfficial(i, p)
+    l = LoaderOfficial(datapath, i, p)
 
     (devset, testset) = l.load_data(dtype=dtype)
 

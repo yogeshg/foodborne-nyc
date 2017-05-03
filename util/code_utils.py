@@ -16,6 +16,11 @@ def save_code():
     return o
 
 def assert_type(argument, typename):
-    message = 'expected type: {} instead got: {}'
+    message = 'got type:{} but expected type:{}'
     t1 = type(argument)
-    assert(t1==typename, message.format(str(t1), str(typename)))
+    assert t1==typename, message.format(str(t1), str(typename))
+
+def assert_in(argument, possibilities):
+    message = 'got: {} but possibilities: {}'
+    assert argument in possibilities, message.format(str(argument), str(possibilities))
+
