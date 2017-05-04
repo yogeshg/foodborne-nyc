@@ -1,0 +1,12 @@
+models module
+*************
+
+models.get_model(maxlen=964, dimensions=200, finetune=False, vocab_size=1000, pooling='max', kernel_sizes=(), filters=0, weights=None, dropout_rate=0, kernel_l2_regularization=0, lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+
+   maxlen : maximum size of each document dimensions : dimension of
+   each vector finetune : [True, False] : weather or not to finetune
+   word emdeddings vocab_size : size of the vocabulary, emdeddings
+   layer will be this big pooling : ['average', 'logsumexp'] : pooling
+   operation for word vectors in a document kernel_sizes : tuple :
+   convolve using unigrams / bigrams / trigrams filters : None or int
+   : number of filters for convolutional layer

@@ -1,0 +1,12 @@
+layers module
+*************
+
+class layers.LogSumExpPooling(**kwargs)
+
+   Bases: "keras.engine.topology.Layer"
+
+   call(x)
+
+   compute_output_shape(input_shape)
+
+layers.get_conv_stack(input_layer, filters, kernel_sizes, activation, kernel_l2_regularization, dropout_rate)

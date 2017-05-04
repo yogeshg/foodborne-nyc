@@ -1,0 +1,40 @@
+foodborne-nyc
+*************
+
+* config module
+
+* datasets package
+
+  * Submodules
+
+  * datasets.twitter_official module
+
+  * datasets.yelp module
+
+  * datasets.yelp_official module
+
+  * Module contents
+
+* layers module
+
+* main module
+
+* metrics module
+
+* models module
+
+* test module
+
+* util package
+
+  * Submodules
+
+  * util.archiver module
+
+  * util.code_utils module
+
+  * util.experiment_utils module
+
+  * util.string_utils module
+
+  * Module contents

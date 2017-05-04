@@ -1,0 +1,270 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>datasets package &#8212; foodborne-nyc  documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="layers module" href="layers.html" />
+    <link rel="prev" title="config module" href="config.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="datasets-package">
+<h1>datasets package<a class="headerlink" href="#datasets-package" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="datasets-twitter-official-module">
+<h2>datasets.twitter_official module<a class="headerlink" href="#datasets-twitter-official-module" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="module-datasets.yelp">
+<span id="datasets-yelp-module"></span><h2>datasets.yelp module<a class="headerlink" href="#module-datasets.yelp" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="datasets.yelp.Embeddings">
+<em class="property">class </em><code class="descclassname">datasets.yelp.</code><code class="descname">Embeddings</code><span class="sig-paren">(</span><em>embeddingspath</em>, <em>indexer</em>, <em>size=None</em>, <em>vocab_size=None</em><span class="sig-paren">)</span><a class="headerlink" href="#datasets.yelp.Embeddings" title="Permalink to this definition">¶</a></dt>
+<dd><p>Deals with the word embeddings
+embeddingspath : path of the file that stores embeddings</p>
+<blockquote>
+<div>first line contains m  and n separted by space
+following m lines each contain token followed by n floats</div></blockquote>
+<p>indexer : this is required to map each token to an index
+embeddings : token -&gt; list of floats, reload() refreshes this
+get_embeddings : document -&gt; list of embeddings (list of floats)
+get_embeddings_matrix : list of list of embeddings (list of floats)</p>
+<dl class="method">
+<dt id="datasets.yelp.Embeddings.get_embeddings">
+<code class="descname">get_embeddings</code><span class="sig-paren">(</span><em>document</em><span class="sig-paren">)</span><a class="headerlink" href="#datasets.yelp.Embeddings.get_embeddings" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="datasets.yelp.Embeddings.get_embeddings_matrix">
+<code class="descname">get_embeddings_matrix</code><span class="sig-paren">(</span><em>corpus</em><span class="sig-paren">)</span><a class="headerlink" href="#datasets.yelp.Embeddings.get_embeddings_matrix" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="datasets.yelp.Embeddings.reload">
+<code class="descname">reload</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#datasets.yelp.Embeddings.reload" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="datasets.yelp.Embeddings.set_embeddings_matrix">
+<code class="descname">set_embeddings_matrix</code><span class="sig-paren">(</span><em>embedding_matrix</em>, <em>fname</em><span class="sig-paren">)</span><a class="headerlink" href="#datasets.yelp.Embeddings.set_embeddings_matrix" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="datasets.yelp.Index">
+<em class="property">class </em><code class="descclassname">datasets.yelp.</code><code class="descname">Index</code><span class="sig-paren">(</span><em>indexpath</em>, <em>unknown_index=-1</em><span class="sig-paren">)</span><a class="headerlink" href="#datasets.yelp.Index" title="Permalink to this definition">¶</a></dt>
+<dd><p>This class stores the mappings between tokens to index
+indexpath : where the index file is stored, each line has a word and index</p>
+<blockquote>
+<div>line number serves as the index of the word</div></blockquote>
+<p>unknown_index : this what we would represent an unknown word as
+get_index : token (integer) -&gt; index (integer)
+get_token : index (string) -&gt; token (string)</p>
+<dl class="method">
+<dt id="datasets.yelp.Index.get_index">
+<code class="descname">get_index</code><span class="sig-paren">(</span><em>token</em><span class="sig-paren">)</span><a class="headerlink" href="#datasets.yelp.Index.get_index" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="datasets.yelp.Index.get_token">
+<code class="descname">get_token</code><span class="sig-paren">(</span><em>index</em><span class="sig-paren">)</span><a class="headerlink" href="#datasets.yelp.Index.get_token" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="datasets.yelp.LoaderOfficial">
+<em class="property">class </em><code class="descclassname">datasets.yelp.</code><code class="descname">LoaderOfficial</code><span class="sig-paren">(</span><em>datapath</em>, <em>indexer</em>, <em>preprocessor=None</em><span class="sig-paren">)</span><a class="headerlink" href="#datasets.yelp.LoaderOfficial" title="Permalink to this definition">¶</a></dt>
+<dd><p>reads reviews from the yelp_official module, indexes using an indexer
+indexer : to convert lines (list of tokens) into indexes
+load_data : reads the csv and converts words to list of indexes into X, y</p>
+<blockquote>
+<div>makes into a numpy array if dtype is specified
+returns training and testing data</div></blockquote>
+<dl class="method">
+<dt id="datasets.yelp.LoaderOfficial.load_data">
+<code class="descname">load_data</code><span class="sig-paren">(</span><em>dtype=None</em>, <em>maxlen=None</em><span class="sig-paren">)</span><a class="headerlink" href="#datasets.yelp.LoaderOfficial.load_data" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="datasets.yelp.LoaderOld">
+<em class="property">class </em><code class="descclassname">datasets.yelp.</code><code class="descname">LoaderOld</code><span class="sig-paren">(</span><em>filepath</em>, <em>indexer</em>, <em>preprocessor=None</em><span class="sig-paren">)</span><a class="headerlink" href="#datasets.yelp.LoaderOld" title="Permalink to this definition">¶</a></dt>
+<dd><p>reads reviews from a filepath, indexes using an indexer
+filepath : file where reviews are stored, csv file</p>
+<blockquote>
+<div>columns are &#8216;data&#8217;, &#8216;label&#8217;
+each line contains quoted string as data and an integer label</div></blockquote>
+<p>indexer : to convert lines (list of tokens) into indexes
+load_data : reads the csv and converts words to list of indexes into X, y</p>
+<blockquote>
+<div>makes into a numpy array if dtype is specified
+returns training and testing data</div></blockquote>
+<dl class="method">
+<dt id="datasets.yelp.LoaderOld.load_data">
+<code class="descname">load_data</code><span class="sig-paren">(</span><em>dtype=None</em>, <em>maxlen=None</em>, <em>ratio_dev_test=0.8</em><span class="sig-paren">)</span><a class="headerlink" href="#datasets.yelp.LoaderOld.load_data" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="datasets.yelp.Preprocessor">
+<em class="property">class </em><code class="descclassname">datasets.yelp.</code><code class="descname">Preprocessor</code><span class="sig-paren">(</span><em>datapath='/tmp/yo/.python/spacy/data/'</em><span class="sig-paren">)</span><a class="headerlink" href="#datasets.yelp.Preprocessor" title="Permalink to this definition">¶</a></dt>
+<dd><p>We use spacy to convert words to tokens
+install spacy and download the data file to ensure this works
+spacy automatically breaks the words based on punctuations and white spaces
+right now, we exclude all the punctuations and consider only words
+datapath : path of the spacy data file
+get_tokens : &#8216;a string like this&#8217; -&gt; [&#8216;a&#8217;, &#8216;string&#8217;, &#8216;like&#8217;, &#8216;this&#8217;]
+get_preprocessed : &#8220;a string that&#8217;s like this. or this!&#8221; -&gt; &#8220;a string that &#8216;s like this or this&#8221;</p>
+<dl class="method">
+<dt id="datasets.yelp.Preprocessor.get_preprocessed">
+<code class="descname">get_preprocessed</code><span class="sig-paren">(</span><em>line</em><span class="sig-paren">)</span><a class="headerlink" href="#datasets.yelp.Preprocessor.get_preprocessed" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="datasets.yelp.Preprocessor.get_tokens">
+<code class="descname">get_tokens</code><span class="sig-paren">(</span><em>line</em><span class="sig-paren">)</span><a class="headerlink" href="#datasets.yelp.Preprocessor.get_tokens" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="datasets.yelp.cutXY">
+<code class="descclassname">datasets.yelp.</code><code class="descname">cutXY</code><span class="sig-paren">(</span><em>xy</em>, <em>ratio</em><span class="sig-paren">)</span><a class="headerlink" href="#datasets.yelp.cutXY" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="datasets.yelp.load_devset_testset_index">
+<code class="descclassname">datasets.yelp.</code><code class="descname">load_devset_testset_index</code><span class="sig-paren">(</span><em>datapath</em>, <em>indexpath</em>, <em>maxlen=None</em>, <em>dtype=&lt;type 'numpy.float32'&gt;</em><span class="sig-paren">)</span><a class="headerlink" href="#datasets.yelp.load_devset_testset_index" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="datasets.yelp.load_embeddings_matrix">
+<code class="descclassname">datasets.yelp.</code><code class="descname">load_embeddings_matrix</code><span class="sig-paren">(</span><em>indexpath</em>, <em>embeddingspath</em><span class="sig-paren">)</span><a class="headerlink" href="#datasets.yelp.load_embeddings_matrix" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="datasets.yelp.test">
+<code class="descclassname">datasets.yelp.</code><code class="descname">test</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#datasets.yelp.test" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</div>
+<div class="section" id="module-datasets.yelp_official">
+<span id="datasets-yelp-official-module"></span><h2>datasets.yelp_official module<a class="headerlink" href="#module-datasets.yelp_official" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="datasets.yelp_official.split_dev_test">
+<code class="descclassname">datasets.yelp_official.</code><code class="descname">split_dev_test</code><span class="sig-paren">(</span><em>data</em>, <em>test_size=0.2</em><span class="sig-paren">)</span><a class="headerlink" href="#datasets.yelp_official.split_dev_test" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get a stratified random sample of reviews, dropping any biased teset reviews</p>
+</dd></dl>
+
+</div>
+<div class="section" id="module-datasets">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-datasets" title="Permalink to this headline">¶</a></h2>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">datasets package</a><ul>
+<li><a class="reference internal" href="#submodules">Submodules</a></li>
+<li><a class="reference internal" href="#datasets-twitter-official-module">datasets.twitter_official module</a></li>
+<li><a class="reference internal" href="#module-datasets.yelp">datasets.yelp module</a></li>
+<li><a class="reference internal" href="#module-datasets.yelp_official">datasets.yelp_official module</a></li>
+<li><a class="reference internal" href="#module-datasets">Module contents</a></li>
+</ul>
+</li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  <li><a href="modules.html">foodborne-nyc</a><ul>
+      <li>Previous: <a href="config.html" title="previous chapter">config module</a></li>
+      <li>Next: <a href="layers.html" title="next chapter">layers module</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/datasets.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2017, Yogesh Garg, Thomas Effland.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.5</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/datasets.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,32 @@
+Welcome to foodborne-nyc's documentation!
+*****************************************
+
+Contents:
+
+* foodborne-nyc
+
+  * config module
+
+  * datasets package
+
+  * layers module
+
+  * main module
+
+  * metrics module
+
+  * models module
+
+  * test module
+
+  * util package
+
+
+Indices and tables
+******************
+
+* Index
+
+* Module Index
+
+* Search Page

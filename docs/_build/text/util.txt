@@ -1,0 +1,66 @@
+util package
+************
+
+
+Submodules
+==========
+
+
+util.archiver module
+====================
+
+class util.archiver.Archiver(datadir=None, currdir=None, archive=None, writeInfoFile=True)
+
+   Bases: "object"
+
+   close()
+
+   getDirPath()
+
+   getFilePath(p)
+
+   open()
+
+util.archiver.archiveDir(CURRDIR, ARCHIVE)
+
+util.archiver.cleanDir(p)
+
+util.archiver.ensureDir(p)
+
+util.archiver.getTs()
+
+util.archiver.get_archiver(*args, **kwds)
+
+util.archiver.test()
+
+
+util.code_utils module
+======================
+
+util.code_utils.assert_in(argument, possibilities)
+
+util.code_utils.assert_type(argument, typename)
+
+util.code_utils.save_code()
+
+
+util.experiment_utils module
+============================
+
+util.experiment_utils.plot_metric(df, metric_name, i, dirpath)
+
+util.experiment_utils.plot_model(*args, **kwargs)
+
+
+util.string_utils module
+========================
+
+util.string_utils.xstr(s)
+
+util.string_utils.xuni(s)
+
+
+Module contents
+===============
+
+util.fill_dict(d1, d2)

@@ -1,0 +1,19 @@
+main module
+***********
+
+main.load_data(datapath, indexpath, embeddingspath, testdata=False)
+
+main.run_experiments(finetune, kernel_sizes, filters, lr, pooling, kernel_l2_regularization, other_params)
+
+main.save_history(history, dirpath)
+
+   Saves the parameters of training as returned by the history object
+   of keras Saves the history dataframe, not required since also saved
+   by csvloggger Plots the metrics required from this data, this
+   depends on the experiment
+
+main.save_model(hyperparams, model, get_filename)
+
+   hyperparams : dict of hyper parameters model : keras model
+   get_filename : a function/or lambda that takes in a filename and
+   retuns saveable path

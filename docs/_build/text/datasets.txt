@@ -1,0 +1,113 @@
+datasets package
+****************
+
+
+Submodules
+==========
+
+
+datasets.twitter_official module
+================================
+
+
+datasets.yelp module
+====================
+
+class datasets.yelp.Embeddings(embeddingspath, indexer, size=None, vocab_size=None)
+
+   Deals with the word embeddings embeddingspath : path of the file
+   that stores embeddings
+
+      first line contains m  and n separted by space following m lines
+      each contain token followed by n floats
+
+   indexer : this is required to map each token to an index embeddings
+   : token -> list of floats, reload() refreshes this get_embeddings :
+   document -> list of embeddings (list of floats)
+   get_embeddings_matrix : list of list of embeddings (list of floats)
+
+   get_embeddings(document)
+
+   get_embeddings_matrix(corpus)
+
+   reload()
+
+   set_embeddings_matrix(embedding_matrix, fname)
+
+class datasets.yelp.Index(indexpath, unknown_index=-1)
+
+   This class stores the mappings between tokens to index indexpath :
+   where the index file is stored, each line has a word and index
+
+      line number serves as the index of the word
+
+   unknown_index : this what we would represent an unknown word as
+   get_index : token (integer) -> index (integer) get_token : index
+   (string) -> token (string)
+
+   get_index(token)
+
+   get_token(index)
+
+class datasets.yelp.LoaderOfficial(datapath, indexer, preprocessor=None)
+
+   reads reviews from the yelp_official module, indexes using an
+   indexer indexer : to convert lines (list of tokens) into indexes
+   load_data : reads the csv and converts words to list of indexes
+   into X, y
+
+      makes into a numpy array if dtype is specified returns training
+      and testing data
+
+   load_data(dtype=None, maxlen=None)
+
+class datasets.yelp.LoaderOld(filepath, indexer, preprocessor=None)
+
+   reads reviews from a filepath, indexes using an indexer filepath :
+   file where reviews are stored, csv file
+
+      columns are 'data', 'label' each line contains quoted string as
+      data and an integer label
+
+   indexer : to convert lines (list of tokens) into indexes load_data
+   : reads the csv and converts words to list of indexes into X, y
+
+      makes into a numpy array if dtype is specified returns training
+      and testing data
+
+   load_data(dtype=None, maxlen=None, ratio_dev_test=0.8)
+
+class datasets.yelp.Preprocessor(datapath='/tmp/yo/.python/spacy/data/')
+
+   We use spacy to convert words to tokens install spacy and download
+   the data file to ensure this works spacy automatically breaks the
+   words based on punctuations and white spaces right now, we exclude
+   all the punctuations and consider only words datapath : path of the
+   spacy data file get_tokens : 'a string like this' -> ['a',
+   'string', 'like', 'this'] get_preprocessed : "a string that's like
+   this. or this!" -> "a string that 's like this or this"
+
+   get_preprocessed(line)
+
+   get_tokens(line)
+
+datasets.yelp.cutXY(xy, ratio)
+
+datasets.yelp.load_devset_testset_index(datapath, indexpath, maxlen=None, dtype=<type 'numpy.float32'>)
+
+datasets.yelp.load_embeddings_matrix(indexpath, embeddingspath)
+
+datasets.yelp.test()
+
+
+datasets.yelp_official module
+=============================
+
+datasets.yelp_official.split_dev_test(data, test_size=0.2)
+
+   Get a stratified random sample of reviews, dropping any biased
+   teset reviews
+
+
+Module contents
+===============

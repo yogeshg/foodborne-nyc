@@ -1,0 +1,8 @@
+metrics module
+**************
+
+metrics.auc(y_true, y_pred)
+
+metrics.binary_PFA(y_true, y_pred, threshold=<tensorflow.python.ops.variables.Variable object>)
+
+metrics.binary_PTA(y_true, y_pred, threshold=<tensorflow.python.ops.variables.Variable object>)
