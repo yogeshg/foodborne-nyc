@@ -49,7 +49,7 @@ class Preprocessor():
     get_tokens : 'a string like this' -> ['a', 'string', 'like', 'this']
     get_preprocessed : "a string that's like this. or this!" -> "a string that 's like this or this"
     '''
-    def __init__(self, datapath='/tmp/yo/.python/spacy/data/'):
+    def __init__(self, datapath='~/nobackup/.python/spacy/data/'):
         logger.info('loading spacy from file, '+datapath)
         import spacy
         spacy.util.set_data_path(datapath)
@@ -258,9 +258,9 @@ def load_embeddings_matrix(indexpath, embeddingspath):
 
 def test():
 
-    datapath = '/tmp/yo/foodborne/yelp_labelled_sample.csv'
-    indexpath = '/tmp/yo/foodborne/vocab_yelp_sample.txt'
-    embeddingspath = '/tmp/yo/foodborne/vectors_yelp_sample.txt'
+    datapath = 'data/yelp_labelled_sample.csv'
+    indexpath = 'data/vocab_yelp_sample.txt'
+    embeddingspath = 'data/vectors_yelp_sample.txt'
     ((X, y), (X_test, y_test), index2tokens) = load_devset_testset_index(datapath, indexpath)
     print (X.shape, y.shape)
     print (X_test.shape, y_test.shape)

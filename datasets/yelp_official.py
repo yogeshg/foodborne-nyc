@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
 # ### Load in the sick and multiple data, removing the reviews that are different or are duplicate
 
 # In[99]:
-datadir = '/tmp/yo/foodborne/'
+datadir = 'data/'
 yelp_sick_datapath = datadir + 'yelp_sick_data.csv'
 yelp_mult_datapath = datadir + 'yelp_mult_data.csv'
 labelled_datapath = datadir + 'all_data_from_dohmh.xlsx'

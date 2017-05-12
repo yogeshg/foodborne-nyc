@@ -31,9 +31,8 @@ y_test = None
 def load_data(datapath, indexpath, embeddingspath, testdata=False):
     global embeddings_matrix, X_train, y_train, X_test, y_test
     if( testdata ):
-        datapath = '/tmp/yo/foodborne/yelp_labelled_sample.csv'
-        indexpath = '/tmp/yo/foodborne/vocab_yelp_sample.txt'
-        embeddingspath = '/tmp/yo/foodborne/vectors_yelp_sample.txt'
+        datapath = 'data/yelp_labelled_sample.csv'
+        indexpath = 'data/vocab_yelp_sample.txt'
     
     embeddings_matrix = yelp.load_embeddings_matrix(indexpath, embeddingspath)
     ((X_train, y_train), (X_test, y_test), _) = yelp.load_devset_testset_index(datapath, indexpath)
@@ -103,12 +102,11 @@ def run_experiments(finetune, kernel_sizes, filters, lr, pooling, kernel_l2_regu
 
     hyperparams = util.fill_dict(params, other_params)
 
-    results_dir = '/tmp/yo/foodborne/results/test/'
-    with get_archiver(datadir='/tmp/yo/foodborne/results') as temp, get_archiver() as a:
+    with get_archiver(datadir='data/models') as a1, get_archiver(datadir='data/results') as a:
 
         save_model(hyperparams, model, a.getFilePath)
 
-        modelpath = temp.getFilePath('weights.hdf5')
+        modelpath = a1.getFilePath('weights.hdf5')
         earlystopping = EarlyStopping(monitor=c.monitor, patience=c.patience, verbose=0, mode=c.monitor_objective)
         modelcheckpoint = ModelCheckpoint(modelpath, monitor=c.monitor, save_best_only=True, verbose=0, mode=c.monitor_objective)
         csvlogger = CSVLogger(a.getFilePath('logger.csv'))
