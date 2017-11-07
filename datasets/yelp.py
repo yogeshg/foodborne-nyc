@@ -45,14 +45,11 @@ class Preprocessor():
     install spacy and download the data file to ensure this works
     spacy automatically breaks the words based on punctuations and white spaces
     right now, we exclude all the punctuations and consider only words
-    datapath : path of the spacy data file
     get_tokens : 'a string like this' -> ['a', 'string', 'like', 'this']
     get_preprocessed : "a string that's like this. or this!" -> "a string that 's like this or this"
     '''
-    def __init__(self, datapath='~/nobackup/.python/spacy/data/'):
-        logger.info('loading spacy from file, '+datapath)
+    def __init__(self):
         import spacy
-        spacy.util.set_data_path(datapath)
         self.sp = spacy.load('en')
 
     def get_tokens(self, line):
