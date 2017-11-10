@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 # ### Load in the sick and multiple data, removing the reviews that are different or are duplicate
 
 # In[99]:
-datadir = './'
+datadir = 'data/'
 twitter_sick_datapath = datadir + 'twitter_sick_data.csv'
 
 sick_df = pd.read_csv(twitter_sick_datapath)

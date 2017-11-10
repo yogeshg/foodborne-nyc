@@ -2,6 +2,8 @@ import sh
 
 import logging
 logging.getLogger('sh.command').setLevel(logging.WARNING)
+logging.basicConfig(level = logging.DEBUG, format=
+        '%(asctime)s:%(levelname)s:%(name)s:%(threadName)s:line %(lineno)d: %(message)s')
 
 def save_code():
     try:

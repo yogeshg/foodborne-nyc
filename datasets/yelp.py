@@ -207,26 +207,35 @@ class LoaderOfficial():
                     logger.info(str(tokens))
                     logger.exception(e)
             return (X, maxlen_data)
+
+        # create all data vectors, {X, y, w} for {train, test}
         X_train, maxlen_train = apply_preprocess(data_module.sick_train['x'])
         y_train = data_module.sick_train['y']
+        w_train = [1 for _ in range(len(X_train))]
         X_test, maxlen_test = apply_preprocess(data_module.sick_test['x'])
         y_test = data_module.sick_test['y']
+        w_test = [1 for _ in range(len(X_test))]
 
-        logging.debug('length of X_train: {}, y_train: {}'.format(len(X_train), len(y_train)))
-        logging.debug('length of X_test: {}, y_test: {}'.format(len(X_test), len(y_test)))
+        # log shapes
+        logging.debug('length of X_train: {}, y_train: {}, w_train: {}'.format(len(X_train), len(y_train), len(w_train)))
+        logging.debug('length of X_test: {}, y_test: {}, w_test: {}'.format(len(X_test), len(y_test), len(w_test)))
 
+        # apply transformations
         if(maxlen is None):
             maxlen = max(maxlen_train, maxlen_test)
         X_train = sequence.pad_sequences(X_train, maxlen=maxlen)
         X_test = sequence.pad_sequences(X_test, maxlen=maxlen)
 
+        # make them numpy arrays of a certains dtype iff specified
         if(not dtype is None):
             X_train = np.array(X_train, dtype=dtype)
             y_train = np.array(y_train, dtype=dtype)
+            w_train = np.array(w_train, dtype=dtype)
             X_test = np.array(X_test, dtype=dtype)
             y_test = np.array(y_test, dtype=dtype)
+            w_test = np.array(w_test, dtype=dtype)
 
-        return ((X_train, y_train), (X_test, y_test))
+        return ((X_train, y_train, w_train), (X_test, y_test, w_test))
 
 def load_devset_testset_index(datapath, indexpath, maxlen=None, dtype=np.float32):
     util.assert_type(datapath, str)
@@ -255,15 +264,15 @@ def load_embeddings_matrix(indexpath, embeddingspath):
 
 def test():
 
-    datapath = 'data/yelp_labelled_sample.csv'
+    datapath = 'yelp'
     indexpath = 'data/vocab_yelp_sample.txt'
     embeddingspath = 'data/vectors_yelp_sample.txt'
-    ((X, y), (X_test, y_test), index2tokens) = load_devset_testset_index(datapath, indexpath)
-    print (X.shape, y.shape)
-    print (X_test.shape, y_test.shape)
-    print len(index2tokens)
+    ((X, y, w), (X_test, y_test, w_test), index2tokens) = load_devset_testset_index(datapath, indexpath)
+    logging.info("shape of training data (X, y, w): ({}, {}, {})".format(X.shape, y.shape, w.shape))
+    logging.info("shape of test data (X, y, w): ({}, {}, {})".format(X_test.shape, y_test.shape, w_test.shape))
+    logging.info("length of index2tokens: {}".format(len(index2tokens)))
     m = load_embeddings_matrix(indexpath, embeddingspath)
-    print m.shape
+    logging.info("shape of embeddings_matrix: {}".format(m.shape))
 
 if __name__ == '__main__':
     test()
