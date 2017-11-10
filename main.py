@@ -18,24 +18,26 @@ import config as c
 
 from keras.models import Model
 from keras.callbacks import EarlyStopping, ModelCheckpoint, CSVLogger
-from datasets import yelp
+from datasets import load
 from models import get_model
 
 # Global Variables
 embeddings_matrix = None
 X_train = None
 y_train = None
+w_train = None
 X_test = None
 y_test = None
+w_test = None
 
 def load_data(datapath, indexpath, embeddingspath, testdata=False):
-    global embeddings_matrix, X_train, y_train, X_test, y_test
+    global embeddings_matrix, X_train, y_train, w_train, X_test, y_test, w_test
     if( testdata ):
         datapath = 'data/yelp_labelled_sample.csv'
         indexpath = 'data/vocab_yelp_sample.txt'
     
-    embeddings_matrix = yelp.load_embeddings_matrix(indexpath, embeddingspath)
-    ((X_train, y_train), (X_test, y_test), _) = yelp.load_devset_testset_index(datapath, indexpath)
+    embeddings_matrix = load.load_embeddings_matrix(indexpath, embeddingspath)
+    ((X_train, y_train, w_train), (X_test, y_test, w_test), _) = load.load_devset_testset_index(datapath, indexpath)
 
     for x in (X_train, y_train, X_test, y_test):
         logger.debug("shape and info: "+str((x.shape, x.max(), x.min())))
@@ -86,7 +88,7 @@ def save_history(history, dirpath):
 
 # main
 def run_experiments(finetune, kernel_sizes, filters, lr, pooling, kernel_l2_regularization, other_params):
-    global embeddings_matrix, X_train, y_train, X_test, y_test
+    global embeddings_matrix, X_train, y_train, w_train, X_test, y_test, w_test
     other_params['commit_hash'] = commit_hash
 
     maxlen = X_train.shape[1]
