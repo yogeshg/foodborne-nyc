@@ -172,7 +172,7 @@ class LoaderOld():
 
         return cutXY((X, y), ratio_dev_test)
 
-class LoaderOfficial():
+class LoaderUnbiased():
     '''
     reads reviews from the yelp_official module, indexes using an indexer
     indexer : to convert lines (list of tokens) into indexes
@@ -180,8 +180,9 @@ class LoaderOfficial():
                 makes into a numpy array if dtype is specified
                 returns training and testing data
     '''
-    def __init__(self, datapath, indexer, preprocessor=None ):
-        util.assert_in(datapath, ['yelp', 'twitter'])
+    def __init__(self, dataset, datapath, indexer, preprocessor=None ):
+        util.assert_in(dataset, ['yelp', 'twitter'])
+        self.dataset = dataset
         self.datapath = datapath
         self.pp = preprocessor
         if( self.pp is None):
@@ -189,16 +190,16 @@ class LoaderOfficial():
         self.indexer = indexer
 
     def load_data(self, dtype=None, maxlen=None):
-        logger.info('loading data for {}'.format(self.datapath))
-        if(self.datapath == 'yelp'):
-            import yelp_official as data_module
-        elif(self.datapath == 'twitter'):
-            import twitter_official as data_module
+        logger.info('loading data for {} from {}'.format(self.dataset, self.datapath))
+        from datasets.experiments.baseline_experiment_util import setup_baseline_data, calc_train_importance_weights
+        data_dict = setup_baseline_data(dataset=self.dataset, data_path=self.datapath, test_regime='silver', train_regime='silver')
+
         def apply_preprocess(data_x):
             X = []
             maxlen_data = 0
             for data in data_x: 
-                tokens = self.pp.get_tokens(str(data.astype(str)))
+                data_str = util.xstr(data)
+                tokens = self.pp.get_tokens(data_str)
                 try:
                     index_vectors = [self.indexer.get_index(x) for x in tokens]
                     X.append( index_vectors )
@@ -209,12 +210,12 @@ class LoaderOfficial():
             return (X, maxlen_data)
 
         # create all data vectors, {X, y, w} for {train, test}
-        X_train, maxlen_train = apply_preprocess(data_module.sick_train['x'])
-        y_train = data_module.sick_train['y']
-        w_train = [1 for _ in range(len(X_train))]
-        X_test, maxlen_test = apply_preprocess(data_module.sick_test['x'])
-        y_test = data_module.sick_test['y']
-        w_test = [1 for _ in range(len(X_test))]
+        X_train, maxlen_train = apply_preprocess(data_dict['train_data']['text'])
+        y_train = data_dict['train_data']['is_foodborne']
+        w_train = calc_train_importance_weights(data_dict['train_data']['is_biased'] , data_dict['U'])
+        X_test, maxlen_test = apply_preprocess(data_dict['test_data']['text'])
+        y_test = data_dict['test_data']['is_foodborne']
+        w_test = calc_train_importance_weights(data_dict['test_data']['is_biased'] , data_dict['U'])
 
         # log shapes
         logging.debug('length of X_train: {}, y_train: {}, w_train: {}'.format(len(X_train), len(y_train), len(w_train)))
@@ -237,14 +238,21 @@ class LoaderOfficial():
 
         return ((X_train, y_train, w_train), (X_test, y_test, w_test))
 
-def load_devset_testset_index(datapath, indexpath, maxlen=None, dtype=np.float32):
+def load_devset_testset_index(datapath, indexpath, maxlen=None, dtype=np.float32, dataset=None):
     util.assert_type(datapath, str)
+    if dataset is None:
+        if 'yelp' in datapath:
+            dataset = 'yelp'
+        elif 'twitter' in datapath:
+            dataset = 'twitter'
+        else:
+            logging.info('Cannot infer dataset from datapath '+datapath)
+    
     logger.debug('loading {} data and index: {}'.format(datapath, str(indexpath)))
-    logger.info('ignoring ' + datapath)
     global p, i, l
     p = Preprocessor()
     i = Index(indexpath, unknown_index=0)
-    l = LoaderOfficial(datapath, i, p)
+    l = LoaderUnbiased(dataset, datapath, i, p)
 
     (devset, testset) = l.load_data(dtype=dtype)
 
@@ -264,7 +272,7 @@ def load_embeddings_matrix(indexpath, embeddingspath):
 
 def test():
 
-    datapath = 'yelp'
+    datapath = '~/data/hdd550-data/fbnyc/yelp_data/'
     indexpath = 'data/vocab_yelp_sample.txt'
     embeddingspath = 'data/vectors_yelp_sample.txt'
     ((X, y, w), (X_test, y_test, w_test), index2tokens) = load_devset_testset_index(datapath, indexpath)
