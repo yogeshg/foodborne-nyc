@@ -192,7 +192,7 @@ class LoaderUnbiased():
     def load_data(self, dtype=None, maxlen=None):
         logger.info('loading data for {} from {}'.format(self.dataset, self.datapath))
         from datasets.experiments.baseline_experiment_util import setup_baseline_data, calc_train_importance_weights
-        data_dict = setup_baseline_data(dataset=self.dataset, data_path=self.datapath, test_regime='silver', train_regime='silver')
+        data_dict = setup_baseline_data(dataset=self.dataset, data_path=self.datapath, test_regime='silver', train_regime='silver', silver_size=1000)
 
         def apply_preprocess(data_x):
             X = []

@@ -39,7 +39,7 @@ def load_data(datapath, indexpath, embeddingspath, testdata=False):
     embeddings_matrix = load.load_embeddings_matrix(indexpath, embeddingspath)
     ((X_train, y_train, w_train), (X_test, y_test, w_test), _) = load.load_devset_testset_index(datapath, indexpath)
 
-    for x in (X_train, y_train, X_test, y_test):
+    for x in (X_train, y_train, w_train, X_test, y_test, w_test):
         logger.debug("shape and info: "+str((x.shape, x.max(), x.min())))
 
 
@@ -114,7 +114,7 @@ def run_experiments(finetune, kernel_sizes, filters, lr, pooling, kernel_l2_regu
         csvlogger = CSVLogger(a.getFilePath('logger.csv'))
 
         logger.info('starting training')
-        h = model.fit(X_train, y_train, batch_size=c.batch_size, epochs=c.epochs, verbose=0,
+        h = model.fit(X_train, y_train, sample_weight=w_train, batch_size=c.batch_size, epochs=c.epochs, verbose=0,
             validation_split=0.2, callbacks=[earlystopping, modelcheckpoint, csvlogger])
         logger.info('ending training')
 
