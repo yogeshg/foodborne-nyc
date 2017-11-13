@@ -1,6 +1,6 @@
 
 metrics = ['acc', 'auc']
-monitor = 'val_auc'
+monitor = 'val_acc'
 monitor_objective = 'max'
 epochs = 200
 patience = 50
