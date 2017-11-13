@@ -111,11 +111,11 @@ def run_experiments(finetune, kernel_sizes, filters, lr, pooling, kernel_l2_regu
         modelpath = a1.getFilePath('weights.hdf5')
         earlystopping = EarlyStopping(monitor=c.monitor, patience=c.patience, verbose=0, mode=c.monitor_objective)
         modelcheckpoint = ModelCheckpoint(modelpath, monitor=c.monitor, save_best_only=True, verbose=0, mode=c.monitor_objective)
-        csvlogger = CSVLogger(a.getFilePath('logger.csv'))
+        # csvlogger = CSVLogger(a.getFilePath('logger.csv'))
 
         logger.info('starting training')
         h = model.fit(X_train, y_train, sample_weight=w_train, batch_size=c.batch_size, epochs=c.epochs, verbose=0,
-            validation_split=0.2, callbacks=[earlystopping, modelcheckpoint, csvlogger])
+            validation_split=0.2, callbacks=[earlystopping, modelcheckpoint])
         logger.info('ending training')
 
         save_history(h, a.getDirPath())
