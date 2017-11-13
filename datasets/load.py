@@ -180,9 +180,15 @@ class LoaderUnbiased():
                 makes into a numpy array if dtype is specified
                 returns training and testing data
     '''
+
+    SILVER_SIZE = 1000
+
     def __init__(self, dataset, datapath, indexer, preprocessor=None ):
-        util.assert_in(dataset, ['yelp', 'twitter'])
-        self.dataset = dataset
+        dataset_media, dataset_regime = dataset.split('.')
+        util.assert_in(dataset_media, ['yelp', 'twitter'])
+        self.dataset_media = dataset_media
+        self.dataset_regime = dataset_regime
+
         self.datapath = datapath
         self.pp = preprocessor
         if( self.pp is None):
@@ -190,9 +196,10 @@ class LoaderUnbiased():
         self.indexer = indexer
 
     def load_data(self, dtype=None, maxlen=None):
-        logger.info('loading data for {} from {}'.format(self.dataset, self.datapath))
+        logger.info('loading data for {} from {}'.format('.'.join([self.dataset_media, self.dataset_regime]), self.datapath))
         from datasets.experiments.baseline_experiment_util import setup_baseline_data, calc_train_importance_weights
-        data_dict = setup_baseline_data(dataset=self.dataset, data_path=self.datapath, test_regime='silver', train_regime='silver', silver_size=1000)
+        data_dict = setup_baseline_data(dataset=self.dataset_media, data_path=self.datapath,
+                        test_regime=self.dataset_regime, train_regime=self.dataset_regime, silver_size=self.SILVER_SIZE)
 
         def apply_preprocess(data_x):
             X = []
@@ -238,17 +245,18 @@ class LoaderUnbiased():
 
         return ((X_train, y_train, w_train), (X_test, y_test, w_test))
 
-def load_devset_testset_index(datapath, indexpath, maxlen=None, dtype=np.float32, dataset=None):
-    util.assert_type(datapath, str)
-    if dataset is None:
-        if 'yelp' in datapath:
-            dataset = 'yelp'
-        elif 'twitter' in datapath:
-            dataset = 'twitter'
+def load_devset_testset_index(dataset, indexpath, maxlen=None, dtype=np.float32, datapath=None):
+    util.assert_type(dataset, str)
+
+    if datapath is None:
+        if 'yelp' == dataset.split('.')[0]:
+            datapath = '~/data/hdd550-data/fbnyc/yelp_data/'
+        elif 'twitter' == dataset.split('.')[0]:
+            datapath = '~/data/hdd550-data/fbnyc/twitter_data/'
         else:
-            logging.info('Cannot infer dataset from datapath '+datapath)
+            logging.info('Cannot infer datapath from dataset '+dataset)
     
-    logger.debug('loading {} data and index: {}'.format(datapath, str(indexpath)))
+    logger.debug('loading {} data from path: {} and index: {}'.format(dataset, datapath, str(indexpath)))
     global p, i, l
     p = Preprocessor()
     i = Index(indexpath, unknown_index=0)
@@ -272,10 +280,10 @@ def load_embeddings_matrix(indexpath, embeddingspath):
 
 def test():
 
-    datapath = '~/data/hdd550-data/fbnyc/yelp_data/'
+    dataset = 'yelp.silver'
     indexpath = 'data/vocab_yelp_sample.txt'
     embeddingspath = 'data/vectors_yelp_sample.txt'
-    ((X, y, w), (X_test, y_test, w_test), index2tokens) = load_devset_testset_index(datapath, indexpath)
+    ((X, y, w), (X_test, y_test, w_test), index2tokens) = load_devset_testset_index(dataset, indexpath)
     logging.info("shape of training data (X, y, w): ({}, {}, {})".format(X.shape, y.shape, w.shape))
     logging.info("shape of test data (X, y, w): ({}, {}, {})".format(X_test.shape, y_test.shape, w_test.shape))
     logging.info("length of index2tokens: {}".format(len(index2tokens)))
