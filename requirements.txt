@@ -10,3 +10,4 @@ sh == 1.12.14
 sklearn == 0.0
 spacy == 1.10.0
 tensorflow == 1.4.0
+xlrd

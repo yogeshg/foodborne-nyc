@@ -2,6 +2,7 @@
 import numpy as np
 import numpy.random as npr
 import pandas as pd
+import datetime as dt
 from datetime import datetime
 import os.path as osp
 from collections import defaultdict
@@ -15,6 +16,10 @@ sb.set()
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import confusion_matrix
 from sklearn.externals import joblib
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 def setup_baseline_data(train_regime='gold',
                         test_regime='gold',
@@ -112,6 +117,10 @@ def setup_baseline_data(train_regime='gold',
             sample_size = min(sample_size, len(dataset))
             assert isinstance(dataset, pd.DataFrame), "need a pd.DataFrame object to sample"
             return dataset.sample(sample_size, random_state=random_state)
+
+        def minimalist_xldate_as_datetime(xldate):
+            # datemode: 0 for 1900-based, 1 for 1904-based
+            return (dt.datetime(1899, 12, 30) + dt.timedelta(days=xldate))
         
         biased = pd.read_excel(osp.join(data_path, 'Tom_Twitter_7_27_17.xls'))
         unbiased = pd.read_excel(osp.join(data_path, 'twitter_no_label_9_19_17.xlsx'))
@@ -123,24 +132,36 @@ def setup_baseline_data(train_regime='gold',
         (old_biased, new_biased) = split(biased_csv, test_split_date)
         (old_unbiased, new_unbiased) = split(unbiased_csv, test_split_date)
 
-        if train_regime == 'silver':
+        selected_cols = ['date','text','is_foodborne','is_multiple']
+        if train_regime == 'gold':
+            old_unbiased = pd.read_excel(osp.join(data_path, 'old_biased_complement_sampled_labled.xlsx'))
+            old_unbiased.date = map(minimalist_xldate_as_datetime, old_unbiased.date)
+            old_unbiased = old_unbiased.loc[:,selected_cols]
+        elif train_regime == 'silver':
             old_unbiased = sample(old_unbiased, silver_size, random_state=random_seed)
         elif train_regime == 'biased':
             old_unbiased = pd.DataFrame(columns=old_unbiased.columns)
         else:
             raise ValueError, train_regime + " train regime not supported for " + dataset
 
-        if test_regime == 'silver':
+        if test_regime == 'gold':
+            new_unbiased = pd.read_excel(osp.join(data_path, 'new_biased_complement_sampled_labeled.xlsx'))
+            new_unbiased.date = map(minimalist_xldate_as_datetime, new_unbiased.date)
+            new_unbiased = new_unbiased.loc[:,selected_cols]
+        elif test_regime == 'silver':
             new_unbiased = sample(new_unbiased, silver_size, random_state=random_seed)
         elif test_regime == 'biased':
             new_unbiased = pd.DataFrame(columns=new_unbiased.columns)
         else:
             raise ValueError, test_regime + " test regime not supported for " + dataset
 
-
-
     else:
         raise ValueError, "dataset must be 'yelp' or 'twitter'"
+
+    logger.info('data setup with'
+                 ' len(train_data.text) = {}'
+                 ' len(test_data.text) = {}'
+                 ' U = {}'.format(len(old_biased) + len(old_unbiased), len(new_biased) + len(new_unbiased), U))
         
     return {
         'train_data': {
@@ -583,3 +604,16 @@ def pr_curves(model_list, title_list, main_title, label_key,
     if save_fname:
         plt.savefig(save_fname+'_pr_curves.pdf')
     return fig, ax
+
+def test():
+    logging.basicConfig(level = logging.DEBUG)
+    setup_baseline_data(train_regime='gold', test_regime='gold', dataset='twitter',
+                        data_path='~/data/hdd550-data/fbnyc/twitter_data/',
+                        random_seed=0, silver_size=1000, test_split_date_str=None)
+    setup_baseline_data(train_regime='silver', test_regime='silver', dataset='twitter',
+                        data_path='~/data/hdd550-data/fbnyc/twitter_data/',
+                        random_seed=0, silver_size=1000, test_split_date_str=None)
+    setup_baseline_data(train_regime='biased', test_regime='biased', dataset='twitter',
+                        data_path='~/data/hdd550-data/fbnyc/twitter_data/',
+                        random_seed=0, silver_size=1000, test_split_date_str=None)
+   
