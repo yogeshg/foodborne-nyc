@@ -121,7 +121,13 @@ def setup_baseline_data(train_regime='gold',
         def minimalist_xldate_as_datetime(xldate):
             # datemode: 0 for 1900-based, 1 for 1904-based
             return (dt.datetime(1899, 12, 30) + dt.timedelta(days=xldate))
-        
+
+        def filter_and_map_is_foodborne(df):
+            idx = (df.is_foodborne == 'No') | (df.is_foodborne == 'Yes')
+            df = df[idx]
+            df.is_foodborne = df.is_foodborne.map({'No': 0, 'Yes': 1})
+            return df
+
         biased = pd.read_excel(osp.join(data_path, 'Tom_Twitter_7_27_17.xls'))
         unbiased = pd.read_excel(osp.join(data_path, 'twitter_no_label_9_19_17.xlsx'))
         biased_csv = validate(rename(normalize(biased)))
@@ -137,6 +143,7 @@ def setup_baseline_data(train_regime='gold',
             old_unbiased = pd.read_excel(osp.join(data_path, 'old_biased_complement_sampled_labled.xlsx'))
             old_unbiased.date = map(minimalist_xldate_as_datetime, old_unbiased.date)
             old_unbiased = old_unbiased.loc[:,selected_cols]
+            old_unbiased = filter_and_map_is_foodborne(old_unbiased)
         elif train_regime == 'silver':
             old_unbiased = sample(old_unbiased, silver_size, random_state=random_seed)
         elif train_regime == 'biased':
@@ -148,6 +155,7 @@ def setup_baseline_data(train_regime='gold',
             new_unbiased = pd.read_excel(osp.join(data_path, 'new_biased_complement_sampled_labeled.xlsx'))
             new_unbiased.date = map(minimalist_xldate_as_datetime, new_unbiased.date)
             new_unbiased = new_unbiased.loc[:,selected_cols]
+            new_unbiased = filter_and_map_is_foodborne(new_unbiased)
         elif test_regime == 'silver':
             new_unbiased = sample(new_unbiased, silver_size, random_state=random_seed)
         elif test_regime == 'biased':

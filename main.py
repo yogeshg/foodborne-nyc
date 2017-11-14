@@ -17,7 +17,8 @@ from util.archiver import get_archiver
 import config as c
 
 from keras.models import Model
-from keras.callbacks import EarlyStopping, ModelCheckpoint, CSVLogger
+from keras.callbacks import ModelCheckpoint, CSVLogger
+from callbacks import EarlyStoppingLambda
 from datasets import load
 from models import get_model
 
@@ -108,7 +109,8 @@ def run_experiments(finetune, kernel_sizes, filters, lr, pooling, kernel_l2_regu
         save_model(hyperparams, model, a.getFilePath)
 
         modelpath = a1.getFilePath('weights.hdf5')
-        earlystopping = EarlyStopping(monitor=c.monitor, patience=c.patience, verbose=0, mode=c.monitor_objective)
+        monitor_func = lambda logs: None
+        earlystopping = EarlyStoppingLambda(monitor_func=monitor_func, patience=c.patience, verbose=0, mode=c.monitor_objective)
         modelcheckpoint = ModelCheckpoint(modelpath, monitor=c.monitor, save_best_only=True, verbose=0, mode=c.monitor_objective)
         csvlogger = CSVLogger(a.getFilePath('logger.csv'))
 
