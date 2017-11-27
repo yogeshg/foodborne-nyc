@@ -17,10 +17,10 @@ def save_code():
     o = sh.git('rev-parse', 'HEAD').strip()
     return o
 
-def assert_type(argument, typename):
-    message = 'got type:{} but expected type:{}'
+def assert_type(argument, typenames):
+    message = 'got type:{} but expected one of types:{}'
     t1 = type(argument)
-    assert t1==typename, message.format(str(t1), str(typename))
+    assert isinstance(argument, typenames), message.format(str(t1), str(typenames))
 
 def assert_in(argument, possibilities):
     message = 'got: {} but possibilities: {}'

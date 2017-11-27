@@ -3,6 +3,7 @@ logging.basicConfig(level = logging.INFO, format=
         '%(asctime)s:%(levelname)s:%(name)s:%(threadName)s:line %(lineno)d: %(message)s')
 logger = logging.getLogger(__name__)
 
+# Libraries
 import sys
 import json
 import pandas as pd
@@ -11,16 +12,24 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
+# Source
 import util
 commit_hash = util.save_code()
 from util.archiver import get_archiver
 import config as c
 
+# ML Libraries
 from keras.models import Model
-from keras.callbacks import ModelCheckpoint, CSVLogger
-from callbacks import EarlyStoppingLambda
+
+from torch.nn import Module
+
+# ML Source
 from datasets import load
-from models import get_model
+from datasets.experiments.baseline_experiment_util import importance_weighted_precision_recall
+
+from models import Net
+import train
+from train import EarlyStopping, ModelCheckpoint, CSVLogger
 
 # Global Variables
 embeddings_matrix = None
@@ -46,22 +55,25 @@ def load_data(dataset, indexpath, embeddingspath, testdata=False):
 def save_model(hyperparams, model, get_filename):
     '''
     hyperparams : dict of hyper parameters
-    model : keras model
+    model : keras Model or pytorch Module
     get_filename : a function/or lambda that takes in a filename and retuns saveable path
     '''
     util.assert_type(hyperparams, dict)
-    util.assert_type(model, Model)
+    util.assert_type(model, (Module, Model))
     assert callable(get_filename), 'takes in a filename and retuns saveable path'
 
     with open(get_filename('hyperparameters.json'), 'w') as f:
-        json.dump(hyperparams, f, indent=2)
+        json.dump(hyperparams, f, sort_keys=True, indent=2)
 
     with open(get_filename('model.json'), 'w') as f:
         f.write(model.to_json(indent=2))
 
     stdout = sys.stdout
     with open(get_filename('summary.txt'), 'w') as sys.stdout:
-        model.summary()
+        if isinstance(model, Module):
+            sys.stdout.write(str(model))
+        elif isinstance(model, Model):
+            model.summary()
     sys.stdout = stdout
 
     # util.plot_model(model, to_file=get_filename('model.png'), show_shapes=True, show_layer_names=True)
@@ -93,33 +105,27 @@ def run_experiments(finetune, kernel_sizes, filters, lr, pooling, kernel_l2_regu
 
     maxlen = X_train.shape[1]
     (vocab_size, dimensions) = embeddings_matrix.shape
-    model, params = get_model(
-        maxlen=maxlen, dimensions=dimensions, finetune=finetune, vocab_size=vocab_size,
-        kernel_sizes = kernel_sizes, filters = filters, weights=[embeddings_matrix],
-        dropout_rate=0.5, kernel_l2_regularization=kernel_l2_regularization,
-        lr=lr, pooling=pooling)
-    # TODO: fill like this:
-    # model, params = get_model( kwargs['embeddings'] )
-    # hyperparams = fill_dict(params, kwargs)
+    net = Net(
+        maxlen = maxlen, dimensions = dimensions, finetune = finetune, vocab_size = vocab_size,
+        kernel_sizes = kernel_sizes, filters = filters,
+        dropout_rate = 0.5, kernel_l2_regularization = kernel_l2_regularization, lr=lr,
+        embeddings_matrix = embeddings_matrix)
 
-    hyperparams = util.fill_dict(params, other_params)
+    hyperparams = util.fill_dict(net.hyperparameters, other_params)
 
     with get_archiver(datadir='data/models') as a1, get_archiver(datadir='data/results') as a:
 
-        save_model(hyperparams, model, a.getFilePath)
+        save_model(hyperparams, net, a.getFilePath)
 
-        modelpath = a1.getFilePath('weights.hdf5')
-        monitor_func = lambda logs: None
-        earlystopping = EarlyStoppingLambda(monitor_func=monitor_func, patience=c.patience, verbose=0, mode=c.monitor_objective)
-        modelcheckpoint = ModelCheckpoint(modelpath, monitor=c.monitor, save_best_only=True, verbose=0, mode=c.monitor_objective)
-        csvlogger = CSVLogger(a.getFilePath('logger.csv'))
+        early_stopping = EarlyStopping(importance_weighted_precision_recall, c.patience, c.monitor_objective)
+        model_checkpoint = ModelCheckpoint(a1.getFilePath('weights.hdf5'), True, c.monitor_objective)
+        csv_logger = CSVLogger(a.getFilePath('logger.csv'))
 
-        logger.info('starting training')
-        h = model.fit(X_train, y_train, sample_weight=w_train, batch_size=c.batch_size, epochs=c.epochs, verbose=0,
-            validation_split=0.2, callbacks=[earlystopping, modelcheckpoint, csvlogger])
-        logger.info('ending training')
+        history = train.fit(net, X_train, y_train, w_train,
+                            batch_size=c.batch_size, epochs=c.epochs, validation_split=0.2,
+                            callbacks = [early_stopping, model_checkpoint, csv_logger])
 
-        save_history(h, a.getDirPath())
+        save_history(history, a.getDirPath())
 
     return
 
