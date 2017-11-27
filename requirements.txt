@@ -1,13 +1,13 @@
-Keras == 2.0.9
-graphviz
-h5py
 matplotlib == 2.0.2
 numpy == 1.13.3
 pandas == 0.20.3
 pytz == 2017.2
+requests == 2.18.4
 seaborn == 0.8.1
 sh == 1.12.14
+six == 1.11.0
 sklearn == 0.0
 spacy == 1.10.0
-tensorflow == 1.4.0
+# torch == 0.4.0a0+c52ca23
+# torchvision == 0.1.9
 xlrd
