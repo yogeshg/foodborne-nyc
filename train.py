@@ -2,6 +2,7 @@ from collections import namedtuple
 
 import pandas as pd
 
+import numpy as np
 import logging
 
 logger = logging.getLogger(__name__)
@@ -63,44 +64,76 @@ def fit(*pargs, **kwargs):
                       lr = adam_config.lr, betas = (adam_config.beta_1, adam_config.beta_2),
                       eps = adam_config.epsilon, weight_decay = adam_config.decay)
 
-    for epoch in range(0, args.epochs):
-        logger.info('starting epoch {} of {}'.format(epoch, args.epochs))
+    args.net.cuda()
 
-        epoch_loss = float(0.0)
+    history = []
+    try:
+        for epoch in range(0, args.epochs):
+            logger.info('starting epoch {} of {}'.format(epoch, args.epochs))
 
-        for i, ((X, y), (w, _)) in enumerate(zip(x_train_loader, w_train_loader)):
+            epoch_loss = torch.FloatTensor(np.array([0.0])).cuda()
+            epoch_num_correct = torch.LongTensor(np.array([0.0])).cuda()
+            epoch_total_num = torch.LongTensor(np.array([0.0])).cuda()
 
-            # wrap inputs as variables
-            X = Variable(X)
-            y = Variable(y)
-            w = Variable(w)
+            tt = lambda x: x.view((1, x.size()[0]))
 
-            # zero the parameter gradient
-            adam.zero_grad()
 
-            # forward + backward
-            yp = args.net(X)
-            loss = (w.float() * entropy_values(yp, y).float()).sum()
-            loss.backward()
-            adam.step()
+            for i, ((X, y), (w, _)) in enumerate(zip(x_train_loader, w_train_loader)):
 
-            epoch_loss += loss.data.numpy()[0]
+                # wrap inputs as variables
+                X = Variable(X.cuda())
+                y = Variable(y.cuda())
+                w = Variable(w.cuda())
 
-            #  Todo: plot histograms for yp, w, loss_values, loss
+                # zero the parameter gradient
+                adam.zero_grad()
 
-            # logger.debug('y.size()  :{}'.format(y.size()))
-            # logger.debug('yp.size() :{}'.format(yp.size()))
-            # logger.debug('w.size()  :{}'.format(w.size()))
-            # logger.debug('entropy_values(yp, y).size()  :{}'.format(entropy_values(yp, y).size()))
-            # logger.debug('w :{}'.format(w))
-            u.log_frequently(10, i,logger.debug, '{}-th batch loss collected: {}'.format(i, epoch_loss))
+                # forward + backward
+                yp = args.net(X)
+                logits = torch.cat((tt(1 - yp), tt(yp))).t()
+                batch_loss_values = entropy_values(logits, y)
+                batch_loss = (w.float() * batch_loss_values).sum()
 
-        logger.debug('epoch loss: {}'.format(epoch_loss))
 
-        for (X, y), (w, _) in zip(x_valid_loader, w_valid_loader):
-            logger.debug('next valid batch size: ' + str(y.size()))
+                epoch_loss += batch_loss.data
+                epoch_total_num += y.size()[0]
+                epoch_num_correct += (tt(y).t() == (yp > 0.5).long()).long().sum().long().data
 
-    history = pd.DataFrame({col: [0] for col in 'loss,val_loss,acc,val_acc,auc,val_auc'.split(',')})
+                batch_loss.backward()
+                adam.step()
+
+
+                #  Todo: plot histograms for yp, w, loss_values, loss
+
+                # logger.debug('y.size()  :{}'.format(y.size()))
+                # logger.debug('yp.size() :{}'.format(yp.size()))
+                # logger.debug('w.size()  :{}'.format(w.size()))
+                # logger.debug('entropy_values(yp, y).size()  :{}'.format(entropy_values(yp, y).size()))
+                # logger.debug('w :{}'.format(w))
+                # u.log_frequently(10, i,logger.info, '{}-th batch loss_values: {}'.format(i, tt(loss_values)))
+                # u.log_frequently(10, i,logger.debug, '{}-th batch loss collected: {}'.format(i, epoch_loss))
+
+            # logger.debug('epoch loss: {}'.format(epoch_loss))
+            # logger.debug('epoch total: {}'.format(epoch_total_num))
+            # logger.debug('epoch correct: {}'.format(epoch_num_correct))
+            history.append([epoch_loss.cpu().numpy()[0],
+                            float(epoch_num_correct.cpu().numpy()[0])/float(epoch_total_num.cpu().numpy()[0]),
+                            float(epoch_total_num.cpu().numpy()[0])
+                            ])
+
+            for (X, y), (w, _) in zip(x_valid_loader, w_valid_loader):
+                logger.debug('next valid batch size: ' + str(y.size()))
+    except Exception, e:
+        logger.exception(e)
+        logger.info('error in training, continuing')
+
     params = {}
+    # history_df = pd.DataFrame({col: [0] for col in 'loss,val_loss,acc,val_acc,auc,val_auc'.split(',')})
+    history_df = pd.DataFrame.from_records(history)
+    history_df.columns = ['loss', 'acc', 'auc']
+    history_df.loc[:, 'val_loss'] = history_df.loc[:, 'loss']
+    history_df.loc[:, 'val_acc'] = history_df.loc[:, 'acc']
+    history_df.loc[:, 'val_auc'] = history_df.loc[:, 'auc']
+    # history_df = pd.DataFrame({'loss': history,'val_loss','acc','val_acc','auc','val_auc'})
 
-    return FitReturn(history, params)
+    return FitReturn(history_df, params)

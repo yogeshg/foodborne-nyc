@@ -1,7 +1,7 @@
 import csv
 import numpy as np
 # import spacy
-from keras.preprocessing import sequence
+from util.preprocessing import sequence
 import logging
 import util
 
