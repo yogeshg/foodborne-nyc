@@ -17,12 +17,21 @@ def save_code():
     o = sh.git('rev-parse', 'HEAD').strip()
     return o
 
+
 def assert_type(argument, typenames):
     message = 'got type:{} but expected one of types:{}'
     t1 = type(argument)
     assert isinstance(argument, typenames), message.format(str(t1), str(typenames))
 
+
 def assert_in(argument, possibilities):
     message = 'got: {} but possibilities: {}'
     assert argument in possibilities, message.format(str(argument), str(possibilities))
 
+
+def log_frequently(freq, counter, log_func, message):
+    """
+    logs when counter is 0 mod freq
+    """
+    if( counter % freq == 0 ):
+        log_func( str (counter) + ": " + message)

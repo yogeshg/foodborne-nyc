@@ -110,28 +110,28 @@ class Net(nn.Module):
 
     def forward(self, x):
 
-        logger.debug("activations size: {}".format(x.size()))
+        # logger.debug("activations size: {}".format(x.size()))
 
         x = self.embeddings(x)
-        logger.debug("activations size: {}".format(x.size()))
+        # logger.debug("activations size: {}".format(x.size()))
 
         def get_padded_conved(x, pad, conv):
             pad1_i = getattr(self, pad)
             conv1_i = getattr(self, conv)
             y = conv1_i(pad1_i(x))
-            logger.debug("activations size: {}".format(x.size()))
+            # logger.debug("activations size: {}".format(x.size()))
             return y
 
         x = x.transpose(1,2)
         x = torch.cat([get_padded_conved(x, pad, conv) for pad, conv in zip(self.pad1_layers, self.conv1_layers)], dim=1)
-        logger.debug("activations size: {}".format(x.size()))
+        # logger.debug("activations size: {}".format(x.size()))
         
         x = F.max_pool1d(x, x.size()[-1])
         x = x.transpose(1,2)
-        logger.debug("activations size: {}".format(x.size()))
+        # logger.debug("activations size: {}".format(x.size()))
 
         x = self.fc(x.view(x.size()[0], -1))
-        logger.debug("activations size: {}".format(x.size()))
+        # logger.debug("activations size: {}".format(x.size()))
         return (x)
 
 def get_params_list(net, trainable_only=True):

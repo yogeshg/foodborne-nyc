@@ -19,7 +19,7 @@ from util.archiver import get_archiver
 import config as c
 
 # ML Libraries
-from keras.models import Model
+# from keras.models import Model
 
 from torch.nn import Module
 
@@ -27,9 +27,9 @@ from torch.nn import Module
 from datasets import load
 from datasets.experiments.baseline_experiment_util import importance_weighted_precision_recall
 
-from models import Net
+import models
 import train
-from train import EarlyStopping, ModelCheckpoint, CSVLogger
+# from train import EarlyStopping, ModelCheckpoint, CSVLogger
 
 # Global Variables
 embeddings_matrix = None
@@ -40,10 +40,8 @@ X_test = None
 y_test = None
 w_test = None
 
-def load_data(dataset, indexpath, embeddingspath, testdata=False):
+def load_data(dataset, indexpath, embeddingspath):
     global embeddings_matrix, X_train, y_train, w_train, X_test, y_test, w_test
-    if( testdata ):
-        indexpath = 'data/vocab_yelp_sample.txt'
     
     embeddings_matrix = load.load_embeddings_matrix(indexpath, embeddingspath)
     ((X_train, y_train, w_train), (X_test, y_test, w_test), _) = load.load_devset_testset_index(dataset, indexpath)
@@ -59,7 +57,7 @@ def save_model(hyperparams, model, get_filename):
     get_filename : a function/or lambda that takes in a filename and retuns saveable path
     '''
     util.assert_type(hyperparams, dict)
-    util.assert_type(model, (Module, Model))
+    util.assert_type(model, Module)
     assert callable(get_filename), 'takes in a filename and retuns saveable path'
 
     with open(get_filename('hyperparameters.json'), 'w') as f:
@@ -72,8 +70,6 @@ def save_model(hyperparams, model, get_filename):
     with open(get_filename('summary.txt'), 'w') as sys.stdout:
         if isinstance(model, Module):
             sys.stdout.write(str(model))
-        elif isinstance(model, Model):
-            model.summary()
     sys.stdout = stdout
 
     # util.plot_model(model, to_file=get_filename('model.png'), show_shapes=True, show_layer_names=True)
@@ -105,7 +101,7 @@ def run_experiments(finetune, kernel_sizes, filters, lr, pooling, kernel_l2_regu
 
     maxlen = X_train.shape[1]
     (vocab_size, dimensions) = embeddings_matrix.shape
-    net = Net(
+    net = models.Net(
         maxlen = maxlen, dimensions = dimensions, finetune = finetune, vocab_size = vocab_size,
         kernel_sizes = kernel_sizes, filters = filters,
         dropout_rate = 0.5, kernel_l2_regularization = kernel_l2_regularization, lr=lr,
@@ -117,13 +113,17 @@ def run_experiments(finetune, kernel_sizes, filters, lr, pooling, kernel_l2_regu
 
         save_model(hyperparams, net, a.getFilePath)
 
-        early_stopping = EarlyStopping(importance_weighted_precision_recall, c.patience, c.monitor_objective)
-        model_checkpoint = ModelCheckpoint(a1.getFilePath('weights.hdf5'), True, c.monitor_objective)
-        csv_logger = CSVLogger(a.getFilePath('logger.csv'))
+        early_stopping = train.EarlyStopping(importance_weighted_precision_recall, c.patience, c.monitor_objective)
+        model_checkpoint = train.ModelCheckpoint(a1.getFilePath('weights.hdf5'), True, c.monitor_objective)
+        csv_logger = train.CSVLogger(a.getFilePath('logger.csv'))
+
+        adam_config = train.AdamConfig(lr=net.hyperparameters['lr'], beta_1=net.hyperparameters['beta_1'],
+                                       beta_2=net.hyperparameters['beta_2'], epsilon=net.hyperparameters['epsilon'],
+                                       decay=net.hyperparameters['decay'])
 
         history = train.fit(net, X_train, y_train, w_train,
                             batch_size=c.batch_size, epochs=c.epochs, validation_split=0.2,
-                            callbacks = [early_stopping, model_checkpoint, csv_logger])
+                            callbacks = [early_stopping, model_checkpoint, csv_logger], optimizer=adam_config)
 
         save_history(history, a.getDirPath())
 

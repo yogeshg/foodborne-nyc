@@ -1,5 +1,4 @@
 import pandas as pd
-import keras.utils
 import json
 import logging
 logger = logging.getLogger(__name__)
@@ -19,13 +18,4 @@ def plot_metric(df, metric_name, i, dirpath):
     df.loc[:, [metric_name, val_metric, cname]].plot()
     plt.savefig(dirpath + '/{}.png'.format(metric_name))
     return
-
-def plot_model(*args, **kwargs):
-    output = None
-    try:
-        output = keras.utils.plot_model(*args, **kwargs)
-    except Exception as e:
-        logger.exception(e)
-    return output
-
 
