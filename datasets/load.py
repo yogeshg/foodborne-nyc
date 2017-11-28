@@ -219,14 +219,18 @@ class LoaderUnbiased():
         # create all data vectors, {X, y, w} for {train, test}
         X_train, maxlen_train = apply_preprocess(data_dict['train_data']['text'])
         y_train = data_dict['train_data']['is_foodborne']
-        w_train = calc_train_importance_weights(data_dict['train_data']['is_biased'] , data_dict['U'])
+        z_train = data_dict['train_data']['is_biased']
+        w_train = calc_train_importance_weights(z_train, data_dict['U'])
         X_test, maxlen_test = apply_preprocess(data_dict['test_data']['text'])
         y_test = data_dict['test_data']['is_foodborne']
-        w_test = calc_train_importance_weights(data_dict['test_data']['is_biased'] , data_dict['U'])
+        z_test = data_dict['test_data']['is_biased']
+        w_test = calc_train_importance_weights(z_test, data_dict['U'])
 
         # log shapes
-        logging.debug('length of X_train: {}, y_train: {}, w_train: {}'.format(len(X_train), len(y_train), len(w_train)))
-        logging.debug('length of X_test: {}, y_test: {}, w_test: {}'.format(len(X_test), len(y_test), len(w_test)))
+        logging.debug('length of X_train: {}, y_train: {}, w_train: {}, z_train: {}'.format(
+            len(X_train), len(y_train), len(w_train), len(z_train)))
+        logging.debug('length of X_test: {}, y_test: {}, w_test: {}, z_test: {}'.format(
+            len(X_test), len(y_test), len(w_test), len(z_test)))
 
         # apply transformations
         if(maxlen is None):
@@ -239,11 +243,14 @@ class LoaderUnbiased():
             X_train = np.array(X_train, dtype=dtype)
             y_train = np.array(y_train, dtype=dtype)
             w_train = np.array(w_train, dtype=dtype)
+            z_train = np.array(z_train, dtype=dtype)
+
             X_test = np.array(X_test, dtype=dtype)
             y_test = np.array(y_test, dtype=dtype)
             w_test = np.array(w_test, dtype=dtype)
+            z_test = np.array(z_test, dtype=dtype)
 
-        return ((X_train, y_train, w_train), (X_test, y_test, w_test))
+        return ((X_train, y_train, w_train, z_train), (X_test, y_test, w_test, z_test))
 
 def load_devset_testset_index(dataset, indexpath, maxlen=None, dtype=np.float32, datapath=None):
     util.assert_type(dataset, str)

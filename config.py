@@ -1,6 +1,6 @@
 
-metrics = ['acc', 'auc']
-monitor = 'val_acc'
+metrics = ['accuracy', 'f1']
+monitor = 'val_f1'
 monitor_objective = 'max'
 epochs = 100
 patience = 5

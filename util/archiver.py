@@ -32,12 +32,22 @@ def cleanDir(p):
     ensureDir(p)
     return
 
-def archiveDir(CURRDIR, ARCHIVE):
-    ensureDir(ARCHIVE)
-    archivePath = os.path.join(ARCHIVE, getTs())
+def archiveDir(CURRDIR, ARCHIVE, suffix=''):
+    timestamp = getTs()
+    archive_name = timestamp + suffix
     wd, zd = os.path.split(CURRDIR)
+
+    moved_dir = os.path.join(wd, archive_name)
+    shutil.move(CURRDIR, moved_dir)
+    wd, zd = os.path.split(moved_dir)
+
     logger.debug('archiving directory: '+str((wd,zd)) )
+    
+    # create archive
+    ensureDir(ARCHIVE)
+    archivePath = os.path.join(ARCHIVE, archive_name)
     st = shutil.make_archive( archivePath, 'tar', wd, zd)
+
     logger.info('archived directory: '+str(st) )
     return
 
@@ -49,7 +59,7 @@ def archiveDir(CURRDIR, ARCHIVE):
 DEFAULT_CURRDIR = 'current_'+getTs()
 
 class Archiver(object):
-    def __init__(self, datadir=None, currdir=None, archive=None, writeInfoFile=True):
+    def __init__(self, datadir=None, currdir=None, archive=None, writeInfoFile=True, suffix=''):
         if(datadir is None):
             datadir = os.path.join(os.getcwd(), 'data')
         if(currdir is None):
@@ -60,6 +70,7 @@ class Archiver(object):
         self.CURRDIR = currdir
         self.ARCHIVE = archive
         self.writeInfoFile = writeInfoFile
+        self.suffix = suffix
         self.info = OrderedDict()
         self.info['init'] = getTs()
         hostname = 'unknown'
@@ -96,12 +107,12 @@ class Archiver(object):
         if(self.writeInfoFile):
             with open(self.getFilePath('archiver.json'), 'w') as f:
                 json.dump(self.info, f, indent=2)
-        archiveDir(self.CURRDIR, self.ARCHIVE)
+        archiveDir(self.CURRDIR, self.ARCHIVE, suffix=self.suffix)
         return
 
 @contextmanager
-def get_archiver(datadir=None, currdir=None, archive=None):
-    a = Archiver(datadir=datadir, currdir=currdir, archive=archive)
+def get_archiver(datadir=None, currdir=None, archive=None, suffix=''):
+    a = Archiver(datadir=datadir, currdir=currdir, archive=archive, suffix=suffix)
     a.open()
     try:
         yield a

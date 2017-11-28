@@ -36,15 +36,18 @@ embeddings_matrix = None
 X_train = None
 y_train = None
 w_train = None
+z_train = None
 X_test = None
 y_test = None
 w_test = None
+z_test = None
 
 def load_data(dataset, indexpath, embeddingspath):
-    global embeddings_matrix, X_train, y_train, w_train, X_test, y_test, w_test
+    global embeddings_matrix, X_train, y_train, w_train, z_train, X_test, y_test, w_test, z_test
     
     embeddings_matrix = load.load_embeddings_matrix(indexpath, embeddingspath)
-    ((X_train, y_train, w_train), (X_test, y_test, w_test), _) = load.load_devset_testset_index(dataset, indexpath)
+    ((X_train, y_train, w_train, z_train),
+        (X_test, y_test, w_test, z_test), _) = load.load_devset_testset_index(dataset, indexpath)
 
     for x in (X_train, y_train, w_train, X_test, y_test, w_test):
         logger.debug("shape and info: "+str((x.shape, x.max(), x.min())))
@@ -96,7 +99,9 @@ def save_history(history, dirpath):
 
 # main
 def run_experiments(finetune, kernel_sizes, filters, lr, pooling, kernel_l2_regularization, other_params):
-    global embeddings_matrix, X_train, y_train, w_train, X_test, y_test, w_test
+    global embeddings_matrix, X_train, y_train, w_train, z_train
+    #removing global X_test, y_test, w_test, z_test
+
     other_params['commit_hash'] = commit_hash
 
     maxlen = X_train.shape[1]
@@ -109,7 +114,7 @@ def run_experiments(finetune, kernel_sizes, filters, lr, pooling, kernel_l2_regu
 
     hyperparams = util.fill_dict(net.hyperparameters, other_params)
 
-    with get_archiver(datadir='data/models') as a1, get_archiver(datadir='data/results') as a:
+    with get_archiver(datadir='data/models', suffix="_"+commit_hash[:6]) as a1, get_archiver(datadir='data/results', suffix="_"+commit_hash[:6]) as a:
 
         save_model(hyperparams, net, a.getFilePath)
 
@@ -121,7 +126,7 @@ def run_experiments(finetune, kernel_sizes, filters, lr, pooling, kernel_l2_regu
                                        beta_2=net.hyperparameters['beta_2'], epsilon=net.hyperparameters['epsilon'],
                                        decay=net.hyperparameters['decay'])
 
-        history = train.fit(net, X_train, y_train, w_train,
+        history = train.fit(net, X_train, y_train, w_train, z_train,
                             batch_size=c.batch_size, epochs=c.epochs, validation_split=0.2,
                             callbacks = [early_stopping, model_checkpoint, csv_logger], optimizer=adam_config)
 
