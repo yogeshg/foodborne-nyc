@@ -25,7 +25,6 @@ from torch.nn import Module
 
 # ML Source
 from datasets import load
-from datasets.experiments.baseline_experiment_util import importance_weighted_precision_recall
 
 import models
 import train
@@ -118,7 +117,7 @@ def run_experiments(finetune, kernel_sizes, filters, lr, pooling, kernel_l2_regu
 
         save_model(hyperparams, net, a.getFilePath)
 
-        early_stopping = train.EarlyStopping(importance_weighted_precision_recall, c.patience, c.monitor_objective)
+        early_stopping = train.EarlyStopping('val_f1', c.patience, c.monitor_objective)
         model_checkpoint = train.ModelCheckpoint(a1.getFilePath('weights.hdf5'), True, c.monitor_objective)
         csv_logger = train.CSVLogger(a.getFilePath('logger.csv'))
 

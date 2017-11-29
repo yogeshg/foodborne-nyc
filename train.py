@@ -1,4 +1,4 @@
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 
 import pandas as pd
 
@@ -15,14 +15,14 @@ from torchvision import datasets, transforms
 from torch.autograd import Variable
 from torch.utils.data import TensorDataset, DataLoader
 
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedShuffleSplit
 
 import datasets.experiments.baseline_experiment_util as beutil
 import util as u
 
 DEBUG_TEST_PR_CALCULATION = True
 
-EarlyStopping = namedtuple('EarlyStopping', ['monitor_func', 'patience', 'mode'])
+EarlyStopping = namedtuple('EarlyStopping', ['monitor', 'patience', 'mode'])
 ModelCheckpoint = namedtuple('ModelCheckpoint', ['file_path', 'save_best_only', 'mode'])
 CSVLogger = namedtuple('CSVLogger', ['file_path'])
 
@@ -30,104 +30,36 @@ FitArgs = namedtuple('FitArgs', ['net', 'X', 'y', 'w', 'z', 'batch_size', 'epoch
 AdamConfig = namedtuple('AdamConfig', ['lr', 'beta_1', 'beta_2', 'epsilon', 'decay'])
 FitReturn = namedtuple('FitReturn', ['history', 'params'])
 
-class ConfusionMatrix():
 
-    def __init__(self, tp, fp, fn, tn):
-        self.tp = tp
-        self.fp = fp
-        self.fn = fn
-        self.tn = tn
-
-    def __str__(self):
-        return 'ConfusionMatrix(tp={}, fp={}, fn={}, tn={})'.format(self.tp, self.fp, self.fn, self.tn)
-
-    def __add__(self, other):
-        assert isinstance(other, ConfusionMatrix)
-        return ConfusionMatrix(*map(sum, zip(self, other)))
-
-    def __iadd__(self, other):
-        assert isinstance(other, ConfusionMatrix)
-        self.tp += other.tp
-        self.fp += other.fp
-        self.fn += other.fn
-        self.tn += other.tn
-        return self
-
-    def precision(cm, epsilon = 1e-15):
-        return (cm.tp / (cm.tp + cm.fp + epsilon))
-
-    def recall(cm, epsilon = 1e-15):
-        return (cm.tp / (cm.tp + cm.fn + epsilon))
-
-    def accuracy(cm, epsilon=1e-15):
-        return (cm.tp + cm.tn) / (cm.tp + cm.tn + cm.fp + cm.fn + epsilon)
-
-    def f1(cm, epsilon=1e-15):
-        a = cm.accuracy()
-        p = cm.precision()
-        return (2*a*p) / (a+p+epsilon)
-
-    def to_record(self, prefix='', epsilon=1e-15):
-        return ((prefix + 'tp', self.tp),
-                (prefix + 'fp', self.fp),
-                (prefix + 'fn', self.fn),
-                (prefix + 'tn', self.tn),
-                (prefix + 'precision', self.precision(epsilon=epsilon)),
-                (prefix + 'recall', self.recall(epsilon=epsilon)),
-                (prefix + 'accuracy', self.accuracy(epsilon=epsilon)),
-                (prefix + 'f1', self.f1(epsilon=epsilon)))
-
-
-def get_loaders(x, y, w, z, start, end, batch_size):
-    logger.debug('getting loader for matrices of size {x.shape[0]}, from {start} to {end}'.format(**locals()))
+def get_loaders(x, y, w, z, idx, batch_size):
+    logger.debug('getting loader for matrices of size:{}, num:{}'.format(x.shape[0], len(idx)))
     assert x.shape[0] == y.shape[0] == w.shape[0] == z.shape[0]
-    assert 0 <= start and start <= end and end <= x.shape[0]
-    assert isinstance(start, int)
-    assert isinstance(end, int)
 
-    x_tensor = torch.LongTensor(x[start:end])
-    y_tensor = torch.LongTensor(y[start:end])
-    w_tensor = torch.FloatTensor(w[start:end])
-    z_tensor = torch.LongTensor(z[start:end])
+    x_tensor = torch.LongTensor(x[idx])
+    y_tensor = torch.FloatTensor(y[idx])
+    w_tensor = torch.FloatTensor(w[idx])
+    z_tensor = torch.LongTensor(z[idx])
 
     x_loader = DataLoader(TensorDataset(x_tensor, y_tensor), batch_size=batch_size)
     w_loader = DataLoader(TensorDataset(w_tensor, z_tensor), batch_size=batch_size)
 
     return x_loader, w_loader
 
-# Note: loss is calculated per data point, then weighted by the weight
-# vector. This is done based on the suggestions in following issue:
-# https://github.com/pytorch/pytorch/issues/264
-#
 
-def confusion(y_predicted, y_true, weights):
-    assert isinstance(y_predicted, np.ndarray)
-    assert isinstance(y_true, np.ndarray)
-    assert isinstance(weights, np.ndarray)
-    assert y_predicted.shape == y_true.shape == weights.shape
+def get_metrics(y_predicted_probs, y_true, is_biased):
+    precision, recall = beutil.importance_weighted_precision_recall(
+        y_true, y_predicted_probs, is_biased.astype(bool), 0.5)
 
-    true_positive = ((y_predicted) & (y_true)) * weights
-    false_positive = ((y_predicted) & (~y_true)) * weights
-    false_negative = ((~y_predicted) & (y_true)) * weights
-    true_negative = ((~y_predicted) & (~y_true)) * weights
+    f1 = 2 * precision * recall / (precision + recall + 1e-15)
 
-    # total_count = true_positive.sum() + false_positive.sum() \
-    #               + false_negative.sum() + true_negative.sum()
-    # true_positive_count = true_positive.sum()
-    # accuracy_numer = true_positive.sum() + true_negative.sum()
-    # precision_denom = true_positive.sum() + false_positive.sum()
-    # recall_denom = true_positive.sum() + false_negative.sum()
-    #
-    # logger.debug(str((
-    #     ('total_count', total_count),
-    #     ('true_positive_count', true_positive_count),
-    #     ('accuracy_numer', accuracy_numer),
-    #     ('precision_denom', precision_denom),
-    #     ('recall_denom', recall_denom)
-    # )))
+    precisions, recalls, _ = beutil.importance_weighted_pr_curve(y_true, y_predicted_probs, is_biased.astype(bool))
+    aupr = beutil.area_under_pr_curve(precisions, recalls)
 
-    return ConfusionMatrix(tp=true_positive.sum(), fp=false_positive.sum(),
-                           fn=false_negative.sum(), tn=true_negative.sum())
+    logging.debug('\npost_training_precision:{}\npost_training_recall:{}'.format(
+        precision, recall
+    ))
+
+    return (f1, precision, recall, aupr)
 
 
 def fit(*pargs, **kwargs):
@@ -135,72 +67,59 @@ def fit(*pargs, **kwargs):
     adam_config = args.optimizer
     logger.debug('fitting with arguments: ' + str(args))
 
-    # folds = StratifiedKFold(n_splits=n_cv_splits, random_state=1991)
-
-    total_size = args.X.shape[0]
-    train_size = int((total_size * (1.00 - args.validation_split)) // 1.0)
-
-    x_train_loader, w_train_loader = get_loaders(args.X, args.y, args.w, args.z, 0, train_size, args.batch_size)
-    x_valid_loader, w_valid_loader = get_loaders(args.X, args.y, args.w, args.z, train_size, total_size, args.batch_size)
-
     entropy_values = nn.CrossEntropyLoss(reduce=False)
     adam = optim.Adam(args.net.parameters(),
                       lr = adam_config.lr, betas = (adam_config.beta_1, adam_config.beta_2),
                       eps = adam_config.epsilon, weight_decay = adam_config.decay)
 
-    def calculate_loss(X, y, yp):
-        logits = torch.cat((tt(1 - yp), tt(yp))).t()
-        batch_loss_values = entropy_values(logits, y)
-        batch_loss = (w.float() * batch_loss_values).sum()
-        return batch_loss
-
-    def get_confusion_matrix(yp, _y, _w):
-        # Calculate metrics in cpu
-        # TODO: can be done in GPU
-        y_true = _y.cpu().numpy().astype(bool)
-        y_predicted = (yp.data > 0.5).cpu().numpy().flatten().astype(bool)
-        weights = _w.cpu().numpy()
-        cm = confusion(y_predicted, y_true, weights)
-        return cm
-
     args.net.cuda()
 
     history = []
+    folds = StratifiedShuffleSplit(n_splits=args.epochs, test_size=args.validation_split, random_state=1991)
+    label_bias_tuples = ['{},{}'.format(y,b) for y,b in zip(args.y, args.z)]
+
     # try:
-    for epoch in range(0, args.epochs):
+    for epoch, (training_idx, validation_idx) in enumerate(folds.split(np.zeros(len(args.z)), label_bias_tuples)):
+        x_train_loader, w_train_loader = get_loaders(args.X, args.y, args.w, args.z, training_idx, args.batch_size)
+        x_valid_loader, w_valid_loader = get_loaders(args.X, args.y, args.w, args.z, validation_idx, args.batch_size)
+
 
         u.log_frequently(5, epoch, logger.info, 'starting epoch {} of {}'.format(epoch, args.epochs))
 
         training_loss = torch.FloatTensor(np.array([0.0])).cuda()
-        training_cm = ConfusionMatrix(0, 0, 0, 0)
-
-        tt = lambda x: x.view((1, x.size()[0]))
+        all_y_true = None
+        all_y_prob = None
+        all_is_biased = None
 
         for i, ((_X, _y), (_w, _z)) in enumerate(zip(x_train_loader, w_train_loader)):
 
             # wrap inputs as variables
             X = Variable(_X.cuda())
             y = Variable(_y.cuda())
-            w = Variable(_w.cuda())
+            # w = Variable(_w.cuda())
 
             # zero the parameter gradient
             adam.zero_grad()
 
-            # forward + backward
-            # yp = args.net(X)
-            # logits = torch.cat((tt(1 - yp), tt(yp))).t()
-            # batch_loss_values = entropy_values(logits, y)
-            # _batch_loss = (w.float() * batch_loss_values).sum()
-
             # forward
-            yp = args.net(X)
-            batch_loss = calculate_loss(X, y, yp)
+            yp = F.sigmoid(args.net(X))
+            yp = yp.resize(yp.size()[0])
+
+            batch_loss = nn.BCELoss(weight=_w.cuda().float())(yp, y.float())
 
             # metrics
-            cm = get_confusion_matrix(yp, _y, _w)
-
             training_loss += batch_loss.data
-            training_cm += cm
+            if i == 0:
+                all_y_true = _y.cpu().numpy()
+                all_y_prob = yp.data.cpu().numpy()
+                all_is_biased = _z.numpy()
+
+            else:  # assuming tensor shape is [batch size, 1] (but this might not be quite right)
+                # logging.info('old: {}, update: {}'.format(all_y_prob.shape, yp.data.cpu().numpy().shape))
+                all_y_true = np.concatenate((all_y_true, _y.cpu().numpy()), axis=0)
+                all_y_prob = np.concatenate((all_y_prob, yp.data.cpu().numpy()), axis=0)
+                all_is_biased = np.concatenate((all_is_biased, _z.numpy()), axis=0)
+
 
             # backward
             batch_loss.backward()
@@ -208,46 +127,55 @@ def fit(*pargs, **kwargs):
             # step
             adam.step()
 
-            if(DEBUG_TEST_PR_CALCULATION):
-                _precision, _recall = beutil.importance_weighted_precision_recall(
-                    _y.cpu().numpy(), yp.data.cpu().numpy().flatten(), _z.numpy(), 0.5)
+            u.log_frequently(1, i, logger.debug, '{}-th batch training with size {}'.format(i, y.size()))
 
-                assert np.abs(_precision - cm.precision()) < 1e-8, (_precision, cm.precision())
-                assert np.abs(_recall - cm.recall()) < 1e-8, (_recall, cm.recall())
+        training_f1, training_precision, training_recall, training_aupr = get_metrics(
+            all_y_prob, all_y_true, all_is_biased)
 
-                # u.log_frequently(10, i, logger.debug,
-                #                  '{}-th batch, precision, recall: {}=={}, {}=={}'.format(
-                #                      i, _precision, cm.precision(), _recall, cm.recall()))
-
-            u.log_frequently(10, i, logger.debug, '{}-th batch training with size {}'.format(i, y.size()))
 
         validation_loss = torch.FloatTensor(np.array([0.0])).cuda()
-        validation_cm = ConfusionMatrix(0, 0, 0, 0)
+        all_y_true = None
+        all_y_prob = None
+        all_is_biased = None
 
-        for i, ((_X, _y), (_w, _)) in enumerate(zip(x_valid_loader, w_valid_loader)):
+        for i, ((_X, _y), (_w, _z)) in enumerate(zip(x_valid_loader, w_valid_loader)):
             X = Variable(_X.cuda())
             y = Variable(_y.cuda())
-            w = Variable(_w.cuda())
+            # w = Variable(_w.cuda(), requires_grad=False)
 
             # forward
-            yp = args.net(X)
-            batch_loss = calculate_loss(X, y, yp)
+            yp = F.sigmoid(args.net(X))
+            yp = yp.resize(yp.size()[0])
+            batch_loss = nn.BCELoss(weight=_w.cuda().float())(yp, y.float())
 
             # metrics
-            cm = get_confusion_matrix(yp, _y, _w)
-
             validation_loss += batch_loss.data
-            validation_cm += cm
+            if i == 0:
+                all_y_true = _y.cpu().numpy()
+                all_y_prob = yp.data.cpu().numpy()
+                all_is_biased = _z.numpy()
+
+            else:  # assuming tensor shape is [batch size, 1] (but this might not be quite right)
+                # logging.info('old: {}, update: {}'.format(all_y_prob.shape, yp.data.cpu().numpy().shape))
+                all_y_true = np.concatenate((all_y_true, _y.cpu().numpy()), axis=0)
+                all_y_prob = np.concatenate((all_y_prob, yp.data.cpu().numpy()), axis=0)
+                all_is_biased = np.concatenate((all_is_biased, _z.numpy()), axis=0)
 
             u.log_frequently(10, i, logger.debug, '{}-th batch validating with size {}'.format(i, y.size()))
 
+        validation_f1, validation_precision, validation_recall, validation_aupr = get_metrics(
+            all_y_prob, all_y_true, all_is_biased)
+
+
         record = (('loss', training_loss.cpu().numpy()[0]),)\
-                 + training_cm.to_record(prefix="")
+                 + (('precision', training_precision), ('recall', training_recall))\
+                 + (('f1', training_f1), ('aupr', training_aupr))
         record = record\
                  + (('val_loss', validation_loss.cpu().numpy()[0]),)\
-                 + validation_cm.to_record(prefix="val_")
+                 + (('val_precision', validation_precision), ('val_recall', validation_recall))\
+                 + (('val_f1', validation_f1), ('val_aupr', validation_aupr))
 
-        history.append(dict(record))
+        history.append(OrderedDict(record))
 
     # except Exception, e:
     #     logger.exception(e)
@@ -255,5 +183,7 @@ def fit(*pargs, **kwargs):
     #     raise e
 
     params = {}
+    history_df = pd.DataFrame.from_records(history)
+    history_df.index = history_df.index.rename('epoch')
 
-    return FitReturn(pd.DataFrame.from_records(history), params)
+    return FitReturn(history_df, params)

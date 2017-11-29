@@ -201,24 +201,32 @@ def importance_weighted_precision_recall(y_trues, y_pred_probs, is_biased, thres
     """ Calculate the precision and recall with bias correction. """
     # find the precision at this threshold
     in_Up = y_pred_probs >= threshold # same as predictions at this threshold
-    Up = in_Up.sum().astype(np.float32) + 1e-15 # for stability when there are no positive predictions
-    biased_and_Up = is_biased & in_Up
-    unbiased_and_Up = (~is_biased) & in_Up
-    bias_rate = sum(biased_and_Up)/Up
-    bias_term = bias_rate * (1./Up) * ((y_trues == 1) & biased_and_Up).sum()
-    unbias_term = (1. - bias_rate) * (1./Up) * ((y_trues == 1) & unbiased_and_Up).sum()
-    precision = bias_term + unbias_term
+    Up = in_Up.sum().astype(np.float32) # number of positive predictions
+    
+    if Up > 0.: # model has made some positive classifications
+        biased_and_Up = is_biased & in_Up
+        unbiased_and_Up = (~is_biased) & in_Up
+        p_bias_rate = sum(biased_and_Up)/Up
+        p_bias_term = p_bias_rate * (1./Up) * ((y_trues == 1) & biased_and_Up).sum()
+        p_unbias_term = (1. - p_bias_rate) * (1./Up) * ((y_trues == 1) & unbiased_and_Up).sum()
+        precision = p_bias_term + p_unbias_term
+    else: # model has no positive classifications, which means it's made no precision errors
+        precision = 1.
 
     # find recall at this threshold
     in_Ur = y_trues == 1 # same as true positives
-    Ur = in_Ur.sum().astype(np.float32) + 1e-15 # for stability when there are no positive examples
-    biased_and_Ur = is_biased & in_Ur
-    unbiased_and_Ur = (~is_biased) & in_Ur
-    bias_rate = sum(biased_and_Ur)/Ur
-    bias_term = bias_rate * (1./Ur) * (in_Up & biased_and_Ur).sum() # in_Up is same as preds
-    unbias_term = (1. - bias_rate) * (1./Ur) * (in_Up & unbiased_and_Ur).sum()
-    recall = bias_term + unbias_term
-
+    Ur = in_Ur.sum().astype(np.float32) # number of positive examples
+    if Ur > 0.: # there are positive examples
+        biased_and_Ur = is_biased & in_Ur
+        unbiased_and_Ur = (~is_biased) & in_Ur
+        r_bias_rate = sum(biased_and_Ur)/Ur
+        r_bias_term = r_bias_rate * (1./Ur) * (in_Up & biased_and_Ur).sum() # in_Up is same as preds
+        r_unbias_term = (1. - r_bias_rate) * (1./Ur) * (in_Up & unbiased_and_Ur).sum()
+        recall = r_bias_term + r_unbias_term
+    else: # there are no examples to recall, which means there are no positives to falsely labe negative
+        recall = 1.
+    #if precision == 0. and recall == 0.:
+    #    print '{t} ; {prate:0.2f}, {Up} : {rrate:0.2f}, {Ur}:: '.format(t=threshold, prate=p_bias_rate, rrate=r_bias_rate, Up=Up, Ur=Ur)
     return precision, recall
 
 def importance_weighted_pr_curve(y_trues, y_pred_probs, is_biased, n_thresholds=100):

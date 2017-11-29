@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 import util
 
+
 def get_conv_stack(dimensions, filters, kernel_sizes, activation, kernel_l2_regularization, dropout_rate):
     pads = [nn.ConstantPad1d(((i+1)//2, i//2), 0) for i in kernel_sizes]
     convs = [nn.Conv1d(dimensions, filters, i) for i in kernel_sizes]
@@ -132,7 +133,7 @@ class Net(nn.Module):
 
         x = self.fc(x.view(x.size()[0], -1))
         # logger.debug("activations size: {}".format(x.size()))
-        return (x)
+        return x
 
 def get_params_list(net, trainable_only=True):
     return [[np.prod(p.size()) for p in l.parameters()] for l in net.children() if (not trainable_only) or l.training]
