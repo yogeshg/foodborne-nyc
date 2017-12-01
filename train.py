@@ -71,7 +71,7 @@ class AfterEpoch():
 
 
 FitArgs = namedtuple('FitArgs', ['net', 'X', 'y', 'w', 'z', 'batch_size', 'epochs', 'validation_split', 'callbacks', 'optimizer'])
-AdamConfig = namedtuple('AdamConfig', ['lr', 'beta_1', 'beta_2', 'epsilon', 'decay'])
+AdamConfig = namedtuple('AdamConfig', ['lr', 'beta_1', 'beta_2', 'epsilon', 'weight_decay'])
 FitReturn = namedtuple('FitReturn', ['history', 'params'])
 
 
@@ -111,10 +111,9 @@ def fit(*pargs, **kwargs):
     adam_config = args.optimizer
     logger.debug('fitting with arguments: ' + str(args))
 
-    entropy_values = nn.CrossEntropyLoss(reduce=False)
     adam = optim.Adam(args.net.parameters(),
                       lr = adam_config.lr, betas = (adam_config.beta_1, adam_config.beta_2),
-                      eps = adam_config.epsilon, weight_decay = adam_config.decay)
+                      eps = adam_config.epsilon, weight_decay = adam_config.weight_decay)
 
     (early_stopping, model_checkpoint, csv_logger) = args.callbacks
     after_epoch = AfterEpoch(early_stopping, model_checkpoint)
@@ -137,6 +136,7 @@ def fit(*pargs, **kwargs):
             all_y_prob = None
             all_is_biased = None
 
+            args.net.train()
             for i, ((_X, _y), (_w, _z)) in enumerate(zip(x_train_loader, w_train_loader)):
 
                 # wrap inputs as variables
@@ -183,6 +183,7 @@ def fit(*pargs, **kwargs):
             all_y_prob = None
             all_is_biased = None
 
+            args.net.eval()
             for i, ((_X, _y), (_w, _z)) in enumerate(zip(x_valid_loader, w_valid_loader)):
                 X = Variable(_X.cuda())
                 y = Variable(_y.cuda())

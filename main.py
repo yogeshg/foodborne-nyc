@@ -97,18 +97,17 @@ def save_history(history, dirpath):
     return
 
 # main
-def run_experiments(finetune, kernel_sizes, filters, lr, pooling, kernel_l2_regularization, other_params):
+def run_experiments(finetune, kernel_sizes, filters, lr, pooling, weight_decay, other_params):
     global embeddings_matrix, X_train, y_train, w_train, z_train
     #removing global X_test, y_test, w_test, z_test
 
     other_params['commit_hash'] = commit_hash
 
-    maxlen = X_train.shape[1]
     (vocab_size, dimensions) = embeddings_matrix.shape
     net = models.Net(
-        maxlen = maxlen, dimensions = dimensions, finetune = finetune, vocab_size = vocab_size,
+        dimensions = dimensions, finetune = finetune, vocab_size = vocab_size,
         kernel_sizes = kernel_sizes, filters = filters,
-        dropout_rate = 0.5, kernel_l2_regularization = kernel_l2_regularization, lr=lr,
+        dropout_rate = 0.5, lr=lr,
         embeddings_matrix = embeddings_matrix)
 
     hyperparams = util.fill_dict(net.hyperparameters, other_params)
@@ -123,7 +122,7 @@ def run_experiments(finetune, kernel_sizes, filters, lr, pooling, kernel_l2_regu
 
         adam_config = train.AdamConfig(lr=net.hyperparameters['lr'], beta_1=net.hyperparameters['beta_1'],
                                        beta_2=net.hyperparameters['beta_2'], epsilon=net.hyperparameters['epsilon'],
-                                       decay=net.hyperparameters['decay'])
+                                       weight_decay=net.hyperparameters['weight_decay'])
 
         history = train.fit(net, X_train, y_train, w_train, z_train,
                             batch_size=c.batch_size, epochs=c.epochs, validation_split=0.2,
