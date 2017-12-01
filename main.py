@@ -105,10 +105,9 @@ def run_experiments(finetune, kernel_sizes, filters, lr, pooling, weight_decay, 
 
     (vocab_size, dimensions) = embeddings_matrix.shape
     net = models.Net(
-        dimensions = dimensions, finetune = finetune, vocab_size = vocab_size,
-        kernel_sizes = kernel_sizes, filters = filters,
-        dropout_rate = 0.5, lr=lr,
-        embeddings_matrix = embeddings_matrix)
+        dimensions=dimensions, finetune=finetune, vocab_size=vocab_size,
+        kernel_sizes=kernel_sizes, filters=filters, dropout_rate = 0.5, pooling=pooling,
+        lr=lr, weight_decay=weight_decay, embeddings_matrix = embeddings_matrix)
 
     hyperparams = util.fill_dict(net.hyperparameters, other_params)
 

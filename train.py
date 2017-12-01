@@ -84,8 +84,8 @@ def get_loaders(x, y, w, z, idx, batch_size):
     w_tensor = torch.FloatTensor(w[idx])
     z_tensor = torch.LongTensor(z[idx])
 
-    x_loader = DataLoader(TensorDataset(x_tensor, y_tensor), batch_size=batch_size)
-    w_loader = DataLoader(TensorDataset(w_tensor, z_tensor), batch_size=batch_size)
+    x_loader = DataLoader(TensorDataset(x_tensor, y_tensor), batch_size=batch_size, shuffle=True)
+    w_loader = DataLoader(TensorDataset(w_tensor, z_tensor), batch_size=batch_size, shuffle=True)
 
     return x_loader, w_loader
 
@@ -121,13 +121,14 @@ def fit(*pargs, **kwargs):
     args.net.cuda()
 
     history = []
-    folds = StratifiedShuffleSplit(n_splits=args.epochs, test_size=args.validation_split, random_state=1991)
+    folds = StratifiedShuffleSplit(n_splits=1, test_size=args.validation_split, random_state=1991)
     label_bias_tuples = ['{},{}'.format(y,b) for y,b in zip(args.y, args.z)]
+    training_idx, validation_idx = list(folds.split(np.zeros(len(args.z)), label_bias_tuples))[0]
+    x_train_loader, w_train_loader = get_loaders(args.X, args.y, args.w, args.z, training_idx, args.batch_size)
+    x_valid_loader, w_valid_loader = get_loaders(args.X, args.y, args.w, args.z, validation_idx, args.batch_size)
 
     try:
-        for epoch, (training_idx, validation_idx) in enumerate(folds.split(np.zeros(len(args.z)), label_bias_tuples)):
-            x_train_loader, w_train_loader = get_loaders(args.X, args.y, args.w, args.z, training_idx, args.batch_size)
-            x_valid_loader, w_valid_loader = get_loaders(args.X, args.y, args.w, args.z, validation_idx, args.batch_size)
+        for epoch in range(args.epochs):
 
             u.log_frequently(5, epoch, logger.info, 'starting epoch {} of {}'.format(epoch, args.epochs))
 
