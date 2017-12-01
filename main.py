@@ -117,8 +117,8 @@ def run_experiments(finetune, kernel_sizes, filters, lr, pooling, kernel_l2_regu
 
         save_model(hyperparams, net, a.getFilePath)
 
-        early_stopping = train.EarlyStopping('val_f1', c.patience, c.monitor_objective)
-        model_checkpoint = train.ModelCheckpoint(a1.getFilePath('weights.hdf5'), True, c.monitor_objective)
+        early_stopping = train.EarlyStopping(c.monitor, c.patience, c.monitor_objective)
+        model_checkpoint = train.ModelCheckpoint(a1.getFilePath('checkpoint'))
         csv_logger = train.CSVLogger(a.getFilePath('logger.csv'))
 
         adam_config = train.AdamConfig(lr=net.hyperparameters['lr'], beta_1=net.hyperparameters['beta_1'],

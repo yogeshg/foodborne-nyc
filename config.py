@@ -1,8 +1,8 @@
 
-metrics = ['aupr', 'f1']
+metrics = ['aupr', 'f1', 'precision', 'recall']
 monitor = 'val_f1'
 monitor_objective = 'max'
-epochs = 50
-patience = 5
+epochs = 100
+patience = 10
 batch_size = 256
 

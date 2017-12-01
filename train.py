@@ -1,6 +1,7 @@
 from collections import namedtuple, OrderedDict
 
 import pandas as pd
+import os
 
 import numpy as np
 import logging
@@ -23,8 +24,51 @@ import util as u
 DEBUG_TEST_PR_CALCULATION = True
 
 EarlyStopping = namedtuple('EarlyStopping', ['monitor', 'patience', 'mode'])
-ModelCheckpoint = namedtuple('ModelCheckpoint', ['file_path', 'save_best_only', 'mode'])
+ModelCheckpoint = namedtuple('ModelCheckpoint', ['file_path'])
 CSVLogger = namedtuple('CSVLogger', ['file_path'])
+
+
+class AfterEpoch():
+
+    def __init__(self, early_stopping, model_checkpoint):
+        """
+
+        :param early_stopping: EarlyStopping
+        :param model_checkpoint: ModelCheckpoint
+        """
+        self.early_stopping = early_stopping
+        self.model_checkpoint = model_checkpoint
+        self.num_checked = -1
+        self.prev_best = np.inf if self.early_stopping.mode == 'min' else -np.inf
+        self.prev_best_at = -1
+        self.op = np.less if self.early_stopping.mode == 'min' else np.greater
+        self.best_not_seen_for = 0
+
+    def save_and_stop(self, record, net, optim):
+        """
+
+        :param record: dict
+        :param net: nn.Module
+        :param net: torch.optim
+        :return:
+        """
+
+        val = record[self.early_stopping.monitor]
+        self.num_checked += 1
+        if self.op(val, self.prev_best):
+            self.prev_best = val
+            self.prev_best_at = self.num_checked
+            logger.info("found new {} {} value {}".format(
+                self.early_stopping.mode, self.early_stopping.monitor, val))
+            torch.save(net, self.model_checkpoint.file_path + '.net.pt')
+            torch.save(optim, self.model_checkpoint.file_path + '.optim.pt')
+            self.best_not_seen_for = 0
+        else:
+            self.best_not_seen_for += 1
+            if(self.best_not_seen_for == self.early_stopping.patience):
+                return True
+        return False
+
 
 FitArgs = namedtuple('FitArgs', ['net', 'X', 'y', 'w', 'z', 'batch_size', 'epochs', 'validation_split', 'callbacks', 'optimizer'])
 AdamConfig = namedtuple('AdamConfig', ['lr', 'beta_1', 'beta_2', 'epsilon', 'decay'])
@@ -72,118 +116,123 @@ def fit(*pargs, **kwargs):
                       lr = adam_config.lr, betas = (adam_config.beta_1, adam_config.beta_2),
                       eps = adam_config.epsilon, weight_decay = adam_config.decay)
 
+    (early_stopping, model_checkpoint, csv_logger) = args.callbacks
+    after_epoch = AfterEpoch(early_stopping, model_checkpoint)
+
     args.net.cuda()
 
     history = []
     folds = StratifiedShuffleSplit(n_splits=args.epochs, test_size=args.validation_split, random_state=1991)
     label_bias_tuples = ['{},{}'.format(y,b) for y,b in zip(args.y, args.z)]
 
-    # try:
-    for epoch, (training_idx, validation_idx) in enumerate(folds.split(np.zeros(len(args.z)), label_bias_tuples)):
-        x_train_loader, w_train_loader = get_loaders(args.X, args.y, args.w, args.z, training_idx, args.batch_size)
-        x_valid_loader, w_valid_loader = get_loaders(args.X, args.y, args.w, args.z, validation_idx, args.batch_size)
+    try:
+        for epoch, (training_idx, validation_idx) in enumerate(folds.split(np.zeros(len(args.z)), label_bias_tuples)):
+            x_train_loader, w_train_loader = get_loaders(args.X, args.y, args.w, args.z, training_idx, args.batch_size)
+            x_valid_loader, w_valid_loader = get_loaders(args.X, args.y, args.w, args.z, validation_idx, args.batch_size)
+
+            u.log_frequently(5, epoch, logger.info, 'starting epoch {} of {}'.format(epoch, args.epochs))
+
+            training_loss = torch.FloatTensor(np.array([0.0])).cuda()
+            all_y_true = None
+            all_y_prob = None
+            all_is_biased = None
+
+            for i, ((_X, _y), (_w, _z)) in enumerate(zip(x_train_loader, w_train_loader)):
+
+                # wrap inputs as variables
+                X = Variable(_X.cuda())
+                y = Variable(_y.cuda())
+                # w = Variable(_w.cuda())
+
+                # zero the parameter gradient
+                adam.zero_grad()
+
+                # forward
+                yp = F.sigmoid(args.net(X))
+                yp = yp.resize(yp.size()[0])
+
+                batch_loss = nn.BCELoss(weight=_w.cuda().float())(yp, y.float())
+
+                # metrics
+                training_loss += batch_loss.data
+                if i == 0:
+                    all_y_true = _y.cpu().numpy()
+                    all_y_prob = yp.data.cpu().numpy()
+                    all_is_biased = _z.numpy()
+
+                else:  # assuming tensor shape is [batch size, 1] (but this might not be quite right)
+                    # logging.info('old: {}, update: {}'.format(all_y_prob.shape, yp.data.cpu().numpy().shape))
+                    all_y_true = np.concatenate((all_y_true, _y.cpu().numpy()), axis=0)
+                    all_y_prob = np.concatenate((all_y_prob, yp.data.cpu().numpy()), axis=0)
+                    all_is_biased = np.concatenate((all_is_biased, _z.numpy()), axis=0)
 
 
-        u.log_frequently(5, epoch, logger.info, 'starting epoch {} of {}'.format(epoch, args.epochs))
+                # backward
+                batch_loss.backward()
 
-        training_loss = torch.FloatTensor(np.array([0.0])).cuda()
-        all_y_true = None
-        all_y_prob = None
-        all_is_biased = None
+                # step
+                adam.step()
 
-        for i, ((_X, _y), (_w, _z)) in enumerate(zip(x_train_loader, w_train_loader)):
+                u.log_frequently(1, i, logger.debug, '{}-th batch training with size {}'.format(i, y.size()))
 
-            # wrap inputs as variables
-            X = Variable(_X.cuda())
-            y = Variable(_y.cuda())
-            # w = Variable(_w.cuda())
+            training_f1, training_precision, training_recall, training_aupr = get_metrics(
+                all_y_prob, all_y_true, all_is_biased)
 
-            # zero the parameter gradient
-            adam.zero_grad()
+            validation_loss = torch.FloatTensor(np.array([0.0])).cuda()
+            all_y_true = None
+            all_y_prob = None
+            all_is_biased = None
 
-            # forward
-            yp = F.sigmoid(args.net(X))
-            yp = yp.resize(yp.size()[0])
+            for i, ((_X, _y), (_w, _z)) in enumerate(zip(x_valid_loader, w_valid_loader)):
+                X = Variable(_X.cuda())
+                y = Variable(_y.cuda())
+                # w = Variable(_w.cuda(), requires_grad=False)
 
-            batch_loss = nn.BCELoss(weight=_w.cuda().float())(yp, y.float())
+                # forward
+                yp = F.sigmoid(args.net(X))
+                yp = yp.resize(yp.size()[0])
+                batch_loss = nn.BCELoss(weight=_w.cuda().float())(yp, y.float())
 
-            # metrics
-            training_loss += batch_loss.data
-            if i == 0:
-                all_y_true = _y.cpu().numpy()
-                all_y_prob = yp.data.cpu().numpy()
-                all_is_biased = _z.numpy()
+                # metrics
+                validation_loss += batch_loss.data
+                if i == 0:
+                    all_y_true = _y.cpu().numpy()
+                    all_y_prob = yp.data.cpu().numpy()
+                    all_is_biased = _z.numpy()
 
-            else:  # assuming tensor shape is [batch size, 1] (but this might not be quite right)
-                # logging.info('old: {}, update: {}'.format(all_y_prob.shape, yp.data.cpu().numpy().shape))
-                all_y_true = np.concatenate((all_y_true, _y.cpu().numpy()), axis=0)
-                all_y_prob = np.concatenate((all_y_prob, yp.data.cpu().numpy()), axis=0)
-                all_is_biased = np.concatenate((all_is_biased, _z.numpy()), axis=0)
+                else:  # assuming tensor shape is [batch size, 1] (but this might not be quite right)
+                    # logging.info('old: {}, update: {}'.format(all_y_prob.shape, yp.data.cpu().numpy().shape))
+                    all_y_true = np.concatenate((all_y_true, _y.cpu().numpy()), axis=0)
+                    all_y_prob = np.concatenate((all_y_prob, yp.data.cpu().numpy()), axis=0)
+                    all_is_biased = np.concatenate((all_is_biased, _z.numpy()), axis=0)
 
+                u.log_frequently(10, i, logger.debug, '{}-th batch validating with size {}'.format(i, y.size()))
 
-            # backward
-            batch_loss.backward()
+            validation_f1, validation_precision, validation_recall, validation_aupr = get_metrics(
+                all_y_prob, all_y_true, all_is_biased)
 
-            # step
-            adam.step()
+            record = (('loss', training_loss.cpu().numpy()[0]),)\
+                     + (('precision', training_precision), ('recall', training_recall))\
+                     + (('f1', training_f1), ('aupr', training_aupr))
+            record = record\
+                     + (('val_loss', validation_loss.cpu().numpy()[0]),)\
+                     + (('val_precision', validation_precision), ('val_recall', validation_recall))\
+                     + (('val_f1', validation_f1), ('val_aupr', validation_aupr))
+            record = OrderedDict(record)
+            history.append(record)
 
-            u.log_frequently(1, i, logger.debug, '{}-th batch training with size {}'.format(i, y.size()))
+            if after_epoch.save_and_stop(record, args.net, adam):
+                break
 
-        training_f1, training_precision, training_recall, training_aupr = get_metrics(
-            all_y_prob, all_y_true, all_is_biased)
+    except KeyboardInterrupt, e:
+        logger.exception(e)
+        logger.info('interruption in training, continuing')
+        pass
 
-
-        validation_loss = torch.FloatTensor(np.array([0.0])).cuda()
-        all_y_true = None
-        all_y_prob = None
-        all_is_biased = None
-
-        for i, ((_X, _y), (_w, _z)) in enumerate(zip(x_valid_loader, w_valid_loader)):
-            X = Variable(_X.cuda())
-            y = Variable(_y.cuda())
-            # w = Variable(_w.cuda(), requires_grad=False)
-
-            # forward
-            yp = F.sigmoid(args.net(X))
-            yp = yp.resize(yp.size()[0])
-            batch_loss = nn.BCELoss(weight=_w.cuda().float())(yp, y.float())
-
-            # metrics
-            validation_loss += batch_loss.data
-            if i == 0:
-                all_y_true = _y.cpu().numpy()
-                all_y_prob = yp.data.cpu().numpy()
-                all_is_biased = _z.numpy()
-
-            else:  # assuming tensor shape is [batch size, 1] (but this might not be quite right)
-                # logging.info('old: {}, update: {}'.format(all_y_prob.shape, yp.data.cpu().numpy().shape))
-                all_y_true = np.concatenate((all_y_true, _y.cpu().numpy()), axis=0)
-                all_y_prob = np.concatenate((all_y_prob, yp.data.cpu().numpy()), axis=0)
-                all_is_biased = np.concatenate((all_is_biased, _z.numpy()), axis=0)
-
-            u.log_frequently(10, i, logger.debug, '{}-th batch validating with size {}'.format(i, y.size()))
-
-        validation_f1, validation_precision, validation_recall, validation_aupr = get_metrics(
-            all_y_prob, all_y_true, all_is_biased)
-
-
-        record = (('loss', training_loss.cpu().numpy()[0]),)\
-                 + (('precision', training_precision), ('recall', training_recall))\
-                 + (('f1', training_f1), ('aupr', training_aupr))
-        record = record\
-                 + (('val_loss', validation_loss.cpu().numpy()[0]),)\
-                 + (('val_precision', validation_precision), ('val_recall', validation_recall))\
-                 + (('val_f1', validation_f1), ('val_aupr', validation_aupr))
-
-        history.append(OrderedDict(record))
-
-    # except Exception, e:
-    #     logger.exception(e)
-    #     logger.info('error in training, continuing')
-    #     raise e
-
-    params = {}
+    params = {'epoch': epoch,
+              'es__best_at': after_epoch.prev_best_at, 'es__best_val': after_epoch.prev_best}
     history_df = pd.DataFrame.from_records(history)
     history_df.index = history_df.index.rename('epoch')
 
     return FitReturn(history_df, params)
+
