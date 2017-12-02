@@ -75,19 +75,26 @@ AdamConfig = namedtuple('AdamConfig', ['lr', 'beta_1', 'beta_2', 'epsilon', 'wei
 FitReturn = namedtuple('FitReturn', ['history', 'params'])
 
 
-def get_loaders(x, y, w, z, idx, batch_size):
+def get_loader(x, y, w, z, idx, batch_size):
     logger.debug('getting loader for matrices of size:{}, num:{}'.format(x.shape[0], len(idx)))
     assert x.shape[0] == y.shape[0] == w.shape[0] == z.shape[0]
+    logging.debug('loading data with shapes: {} {} {} {}'.format(
+        x.shape, y.shape, w.shape, z.shape
+    ))
 
     x_tensor = torch.LongTensor(x[idx])
-    y_tensor = torch.FloatTensor(y[idx])
-    w_tensor = torch.FloatTensor(w[idx])
-    z_tensor = torch.LongTensor(z[idx])
 
-    x_loader = DataLoader(TensorDataset(x_tensor, y_tensor), batch_size=batch_size, shuffle=True)
-    w_loader = DataLoader(TensorDataset(w_tensor, z_tensor), batch_size=batch_size, shuffle=True)
+    def reshape_n_n1(x):
+        return x.reshape((x.shape[0], 1))
 
-    return x_loader, w_loader
+    ywz_tensor = torch.FloatTensor(np.concatenate((reshape_n_n1(y[idx]), reshape_n_n1(w[idx]), reshape_n_n1(z[idx])), axis=1))
+
+    logging.debug('size of x_tensor: {}'.format(x_tensor.shape))
+    logging.debug('size of ywz_tensor: {}'.format(ywz_tensor.shape))
+
+    loader = DataLoader(TensorDataset(x_tensor, ywz_tensor), batch_size=batch_size, shuffle=True)
+
+    return loader
 
 
 def get_metrics(y_predicted_probs, y_true, is_biased):
@@ -124,8 +131,8 @@ def fit(*pargs, **kwargs):
     folds = StratifiedShuffleSplit(n_splits=1, test_size=args.validation_split, random_state=1991)
     label_bias_tuples = ['{},{}'.format(y,b) for y,b in zip(args.y, args.z)]
     training_idx, validation_idx = list(folds.split(np.zeros(len(args.z)), label_bias_tuples))[0]
-    x_train_loader, w_train_loader = get_loaders(args.X, args.y, args.w, args.z, training_idx, args.batch_size)
-    x_valid_loader, w_valid_loader = get_loaders(args.X, args.y, args.w, args.z, validation_idx, args.batch_size)
+    train_loader = get_loader(args.X, args.y, args.w, args.z, training_idx, args.batch_size)
+    valid_loader = get_loader(args.X, args.y, args.w, args.z, validation_idx, args.batch_size)
 
     try:
         for epoch in range(args.epochs):
@@ -138,7 +145,12 @@ def fit(*pargs, **kwargs):
             all_is_biased = None
 
             args.net.train()
-            for i, ((_X, _y), (_w, _z)) in enumerate(zip(x_train_loader, w_train_loader)):
+            for i, (_X, (_ywz)) in enumerate(train_loader):
+
+                _y, _w, _z = _ywz[:, 0], _ywz[:, 1], _ywz[:, 2]
+                logging.debug('shape of _y: {}'.format(_y.shape))
+                logging.debug('shape of _w: {}'.format(_w.shape))
+                logging.debug('shape of _z: {}'.format(_z.shape))
 
                 # wrap inputs as variables
                 X = Variable(_X.cuda())
@@ -185,7 +197,10 @@ def fit(*pargs, **kwargs):
             all_is_biased = None
 
             args.net.eval()
-            for i, ((_X, _y), (_w, _z)) in enumerate(zip(x_valid_loader, w_valid_loader)):
+            for i, (_X, _ywz) in enumerate(valid_loader):
+
+                _y, _w, _z = _ywz[:, 0], _ywz[:, 1], _ywz[:, 2]
+
                 X = Variable(_X.cuda())
                 y = Variable(_y.cuda())
                 # w = Variable(_w.cuda(), requires_grad=False)

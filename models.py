@@ -148,18 +148,18 @@ class Net(nn.Module):
             x = F.max_pool1d(x, x.size()[-1])
             x = x.transpose(1, 2)
         else:
-            RuntimeError, 'Unexpected pooling', self.conv1_stack_pooling
+            raise RuntimeError, 'Unexpected pooling', self.conv1_stack_pooling
 
         if(self.conv1_stack_activation=='relu'):
             x = F.relu(x)
         else:
-            RuntimeError, 'Unexpected activation', self.conv1_stack_activation
+            raise RuntimeError, 'Unexpected activation', self.conv1_stack_activation
 
         # logger.debug("activations size: {}".format(x.size()))
 
         # 4. Apply fully connected layer
         x = self.fc(x.view(x.size()[0], -1))
-        logger.debug("activations size: {}".format(x.size()))
+        # logger.debug("activations size: {}".format(x.size()))
         return x
 
 
