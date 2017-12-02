@@ -231,8 +231,9 @@ def fit(*pargs, **kwargs):
         logger.info('interruption in training, continuing')
         pass
 
-    params = {'epoch': epoch,
-              'es__best_at': after_epoch.prev_best_at, 'es__best_val': after_epoch.prev_best}
+    params = {'total_epochs': epoch,
+              'es__best_epoch': after_epoch.prev_best_at,
+              ('es__best_' + after_epoch.early_stopping.monitor): after_epoch.prev_best}
     history_df = pd.DataFrame.from_records(history)
     history_df.index = history_df.index.rename('epoch')
 
