@@ -29,7 +29,12 @@ def get_list_idx(l, i, default):
    else:
       return default
 
-assert len(sys.argv) > 2
+usage = """
+usage:
+    {} directory contains [output_type] [sort_by] [select_cols]
+""".format(sys.argv[0])
+
+assert len(sys.argv) > 2, usage
 
 logger.info('arguments: {}'.format(sys.argv))
 
@@ -56,6 +61,20 @@ if SELECT_COLS is None:
    SELECT_COLS = ','.join(list(df_all.columns))
 df_all = df_all.select(lambda c: c in SELECT_COLS.split(','), axis=1)
 
+def hyperparameter_searcH_results(df_all):
+    df_all.kernel_sizes = df_all.kernel_sizes.astype(str)
+    df_grouped = df_all.groupby(['kernel_sizes', 'filters', 'finetune', 'pooling', 'dirname', 'dataset'])
+    df_all = df_grouped.agg({'val_f1': 'sum'}).unstack().reset_index()
+    return df_all
+
+def rename_datasets_sorted(df):
+    datasets = map(lambda d: ".".join(d), [(m,r) for m in ['twitter', 'yelp']for r in ['gold', 'silver', 'biased']])
+    df.dataset = df.dataset.map({d: str(i)+"."+d for i, d in enumerate(datasets) })
+    return df
+
+df_all = rename_datasets_sorted(df_all)
+
+
 logger.info('sorted all information by {} and selected {} columns'.format(SORT_BY, SELECT_COLS))
 
 if OUTPUT == 'md':
@@ -63,7 +82,7 @@ if OUTPUT == 'md':
    header = "".join((map(lambda c: c if c=="|" else "-",lines[0])))
    print "\n".join([lines[0], header] + lines[1:])
 elif OUTPUT == 'csv':
-   print df_all.to_csv()
+   print df_all.to_csv(index=False)
 else:
    print df_all
 
