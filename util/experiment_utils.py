@@ -15,7 +15,9 @@ def plot_metric(df, metric_name, i, dirpath):
     val_metric = 'val_{}'.format(metric_name)
     cname = 'val_{}_{:04d}'.format(metric_name, i)
     df.loc[:, cname] = df.loc[i, val_metric]
-    df.loc[:, [metric_name, val_metric, cname]].plot()
+    ax = df.loc[:, [metric_name, val_metric, cname]].plot()
     plt.savefig(dirpath + '/{}.png'.format(metric_name))
+    fig = ax.get_figure()
+    plt.close(fig)
     return
 
