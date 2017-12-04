@@ -22,6 +22,27 @@ def get_conv_stack(dimensions, filters, kernel_sizes, dropout_rate):
     drops = [nn.Dropout(p=dropout_rate) for i in kernel_sizes]
     return zip(pads, convs, drops)
 
+def log_sum_exp(value, dim=None, keepdim=False):
+    """Numerically stable implementation of the operation
+
+    value.exp().sum(dim, keepdim).log()
+    """
+    # TODO: torch.max(value, dim=None) threw an error at time of writing
+    if dim is not None:
+        m, _ = torch.max(value, dim=dim, keepdim=True)
+        value0 = value - m
+        if keepdim is False:
+            m = m.squeeze(dim)
+        return m + torch.log(torch.sum(torch.exp(value0),
+                                       dim=dim, keepdim=keepdim))
+    else:
+        m = torch.max(value)
+        sum_exp = torch.sum(torch.exp(value - m))
+        if isinstance(sum_exp, Number):
+            return m + math.log(sum_exp)
+        else:
+            return m + torch.log(sum_exp)
+
 class Net(nn.Module):
     def __init__(self, dimensions=200, finetune=False, vocab_size=1000,
                  pooling='max', activation='relu', kernel_sizes=(1, 2, 3), filters=5, dropout_rate=0.0,
@@ -56,7 +77,7 @@ class Net(nn.Module):
         assert (type(finetune)==bool), type(finetune)
         assert (type(vocab_size)==int), type(vocab_size)
 
-        assert (pooling in ['max', 'avg', 'logsumexp']), '{} not in {}'.format(str(pooling), str(['max', 'average', 'logsumexp']))
+        util.assert_in(pooling, ['max', 'average', 'logsumexp'])
         assert (all(map(lambda x: isinstance(x, int), kernel_sizes))), '{} should all be ints'.format(str(kernel_sizes))
         assert (isinstance(filters,int)), type(filters)
         assert isinstance(dropout_rate, float)
@@ -146,6 +167,15 @@ class Net(nn.Module):
         # 3. Apply pooling, activations
         if(self.conv1_stack_pooling=='max'):
             x = F.max_pool1d(x, x.size()[-1])
+            # logger.debug("activations size: {}".format(x.size()))
+            x = x.transpose(1, 2)
+        elif (self.conv1_stack_pooling == 'average'):
+            x = F.avg_pool1d(x, x.size()[-1])
+            # logger.debug("activations size: {}".format(x.size()))
+            x = x.transpose(1, 2)
+        elif (self.conv1_stack_pooling == 'logsumexp'):
+            x = log_sum_exp(x, dim=2, keepdim=True)
+            # logger.debug("activations size: {}".format(x.size()))
             x = x.transpose(1, 2)
         else:
             raise RuntimeError, 'Unexpected pooling', self.conv1_stack_pooling
@@ -175,14 +205,15 @@ def test():
     x = Variable(torch.LongTensor(64, 936).random_(1000))
     print(x)
 
-    net = Net()
-    print(net)
+    for pooling in ('max', 'average', 'logsumexp'):
+        net = Net(pooling=pooling)
+        print(net)
 
-    print(get_params_list(net, trainable_only=False))
-    print(get_params_list(net))
-    print(get_num_params(net))
+        print(get_params_list(net, trainable_only=False))
+        print(get_params_list(net))
+        print(get_num_params(net))
 
-    y = net(x)
+        y = net(x)
 
 
 def run():
@@ -192,15 +223,16 @@ def run():
     (train_size, _) = main.X_train.shape
     (vocab_size, dimensions) = main.embeddings_matrix.shape
 
-    net = Net(embeddings_matrix=main.embeddings_matrix,
+    for pooling in ('max', 'average', 'logsumexp'):
+        net = Net(pooling=pooling, embeddings_matrix=main.embeddings_matrix,
               vocab_size=vocab_size, dimensions=dimensions)
 
-    batch_size = 64
-    for i in range(train_size // batch_size):
-        x = main.X_train[batch_size * i: batch_size * (i + 1)]
-        y = net(Variable(torch.LongTensor(x)))
-        logger.info('output: {}'.format(y))
-        break
+        batch_size = 64
+        for i in range(train_size // batch_size):
+            x = main.X_train[batch_size * i: batch_size * (i + 1)]
+            y = net(Variable(torch.LongTensor(x)))
+            logger.info('output: {}'.format(y))
+            break
 
 
 if __name__ == '__main__':
