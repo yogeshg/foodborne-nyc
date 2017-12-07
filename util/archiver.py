@@ -106,7 +106,7 @@ class Archiver(object):
         self.info['close'] = getTs()
         if(self.writeInfoFile):
             with open(self.getFilePath('archiver.json'), 'w') as f:
-                json.dump(self.info, f, indent=2)
+                json.dump(self.info, f, indent=0)
         archiveDir(self.CURRDIR, self.ARCHIVE, suffix=self.suffix)
         return
 

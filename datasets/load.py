@@ -4,41 +4,30 @@ import numpy as np
 from util.preprocessing import sequence
 import logging
 import util
+from profilehooks import profile
+import json
 
 logger = logging.getLogger(__name__)
 
-class Index():
-    '''
-    This class stores the mappings between tokens to index
-    indexpath : where the index file is stored, each line has a word and index
-                line number serves as the index of the word
-    unknown_index : this what we would represent an unknown word as
-    get_index : token (integer) -> index (integer)
-    get_token : index (string) -> token (string)
-    '''
-    def __init__(self, indexpath, unknown_index=-1):
-        self.index2tokens = []
-        self.tokens2index = {}
-        self.indexpath = indexpath
-        self.unknown_index = unknown_index
-        logger.info('reading index from file, '+indexpath)
-        with open(indexpath, 'rb') as f:
-            for text in f:
-                line = text.split()
-                token = line[0]
-                frequency = int(line[1])
-                self.index2tokens.append(token)
-                self.tokens2index[token] = len(self.index2tokens)-1
+class LazyIndexer():
+
+    def __init__(self):
+        self._index2tokens = []
+        self._tokens2index = {}
 
     def get_index(self, token):
-        return self.tokens2index.get(token, self.unknown_index)
+        if not self._tokens2index.has_key(token):
+            self._tokens2index[token] = len(self._index2tokens)
+            self._index2tokens.append(token)
+        return self._tokens2index[token]
 
     def get_token(self, index):
-        if index not in range(len(self.index2tokens)):
+        if index >= len(self._index2tokens):
             return 'NONE'
         else:
-            return self.index2tokens[index]
+            return self._index2tokens[index]
 
+ 
 class Preprocessor():
     '''
     We use spacy to convert words to tokens
@@ -51,8 +40,14 @@ class Preprocessor():
     def __init__(self):
         import spacy
         self.sp = spacy.load('en')
+        # self.cache = util.FileDict('.spacy.en.cache.json', 1000)
 
     def get_tokens(self, line):
+        # if not self.cache.has_key(line):
+        #     tokens = [x.text for x in self.sp(util.xuni(line)) if x.pos_!='PUNCT']
+        #     self.cache[line] = tokens
+        # else:
+        #     tokens = self.cache[line]
         tokens = [x.text for x in self.sp(util.xuni(line)) if x.pos_!='PUNCT']
         return tokens
 
@@ -61,116 +56,66 @@ class Preprocessor():
         line2 = util.xuni(" ".join(tokens))
         return line2
 
+
 class Embeddings():
-    """
-    Deals with the word embeddings
-    embeddingspath : path of the file that stores embeddings
-                     first line contains m  and n separted by space
-                     following m lines each contain token followed by n floats
-    indexer : this is required to map each token to an index
-    embeddings : token -> list of floats, reload() refreshes this
-    get_embeddings : document -> list of embeddings (list of floats)
-    get_embeddings_matrix : list of list of embeddings (list of floats)
-    """
-    def __init__(self, embeddingspath, indexer, size=None, vocab_size=None):
-        self.embeddingspath = embeddingspath
-        self.embeddings = {}
+
+    def __init__(self, path, indexer, head = None):
+        assert isinstance(indexer, LazyIndexer)
+        self.path = path
         self.indexer = indexer
-        self.size = size
-        self.vocab_size = vocab_size
-        self.reload()
+        self._head = head
+        self.dimensions = None
+        self._sample = 100
+        with open(self.path, 'rb') as f:
+            for i, text in enumerate(f):
+                line = text.split()
+                token = line[0]
+                weights = map(float, line[1:])
+                if self.dimensions is None:
+                    self.dimensions = len(weights)
+                else:
+                    message = 'expecting {} but got {}'.format(self.dimensions, len(weights))
+                    assert self.dimensions == len(weights), message
+                if i > self._sample:
+                    break
 
-    def reload(self):
-        logger.info('loading embeddings from file, '+self.embeddingspath)
-        with open(self.embeddingspath, 'rb') as f:
-            (vocab_size, size) = map(int, f.readline().split())
+    def get_embeddings_matrix(self):
+        vocab_size = len(self.indexer._index2tokens)
+        embeddings_matrix = np.random.standard_normal(size=(vocab_size, self.dimensions))
 
-            if self.size is None:
-                self.size = size
-            assert self.size == size
-            if self.vocab_size is None:
-                self.vocab_size = vocab_size
-            assert self.vocab_size == vocab_size
+        num_embeddings_found = 0
+        num_embeddings_not_found = len(self.indexer._index2tokens)
+        embeddings_not_found = set(self.indexer._index2tokens)
+        self.dimensions = None
 
+        with open(self.path, 'rb') as f:
             for text in f:
                 line = text.split()
                 token = line[0]
-                weights = [float(x) for x in line[1:]]
-                if(self.size is None):
-                    self.size = len(weights)
-                else:
-                    assert (self.size==len(weights)), 'expecting {} but got {}'.format(self.size, len(weights))
-                self.embeddings[token] = weights
-            assert self.vocab_size == len(self.embeddings)
-        return
 
-    def get_embeddings(self, document):
-        # document is a list of indices from indexer
-        return [self.embeddings[self.indexer.index2tokens[w]] for w in document]
-    
-    def get_embeddings_matrix(self, corpus):
-        # corpus is a list of documents
-        return [self.get_embeddings(d) for d in corpus]
-    
-    def set_embeddings_matrix(self, embedding_matrix, fname):
-        # need to create token -> vector
-        with open(fname, 'w') as f:
-            f.write(' '.join(map(str,embedding_matrix.shape)))
-            f.write('\n')
-            for i,v in enumerate(embedding_matrix):
-                k = self.indexer.get_token(i)
-                f.write(' '.join([k]+[str(x) for x in v]))
-                f.write('\n')
-        
+                if self.indexer._tokens2index.has_key(token):
+                    weights = map(float, line[1:])
+                    if(num_embeddings_found == 0):
+                        self.dimensions = len(weights)
+                    else:
+                        message = 'expecting {} but got {}'.format(self.dimensions, len(weights))
+                        assert self.dimensions == len(weights), message
+                    index = self.indexer._tokens2index[token]
+                    embeddings_matrix[index] = weights
+                    num_embeddings_found += 1
+                    num_embeddings_not_found -= 1
+                    embeddings_not_found.discard(token)
+                    if not self._head is None:
+                        if num_embeddings_found == self._head:
+                            logger.info('head limit reached, not reading more embeddings')
+                            break
 
-def cutXY(xy, ratio):
-    (x,y) = xy
-    assert len(x) == len(y), 'lengths of x ({}) and y ({}) should be the same'.format(len(x), len(y))
-    cut = int(ratio * len(x))
-    return ((x[:cut], y[:cut]),(x[cut:], y[cut:]))
+        logger.info('embeddings found for {}/{} tokens, not found for {}'.format(
+            num_embeddings_found, vocab_size, num_embeddings_not_found))
+        with open('.embeddings.notfound.json', 'w') as f:
+            json.dump({'embeddings_not_found': map(str, embeddings_not_found)}, f, indent=0)
+        return embeddings_matrix
 
-class LoaderOld():
-    '''
-    reads reviews from a filepath, indexes using an indexer
-    filepath : file where reviews are stored, csv file
-                columns are 'data', 'label'
-                each line contains quoted string as data and an integer label
-    indexer : to convert lines (list of tokens) into indexes
-    load_data : reads the csv and converts words to list of indexes into X, y
-                makes into a numpy array if dtype is specified
-                returns training and testing data
-    '''
-    def __init__(self, filepath, indexer, preprocessor=None ):
-        self.filepath = filepath
-        self.pp = preprocessor
-        if( self.pp is None):
-            self.pp = Preprocessor()
-        self.indexer = indexer
-
-    def load_data(self, dtype=None, maxlen=None, ratio_dev_test=0.8):
-        X = []
-        y = []
-        logger.info('loading data from file, '+self.filepath)
-        with open(self.filepath, 'rb') as f:
-            reader = csv.reader(f)
-            ('data', 'label')==reader.next()
-            for line in reader:
-                (data, label) = line
-                tokens = self.pp.get_tokens(data)
-                try:
-                    index_vectors = [self.indexer.get_index(x) for x in tokens]
-                    X.append( index_vectors )
-                    y.append( int(label) )
-                except Exception as e:
-                    logger.info(str(tokens))
-                    logger.exception(e)
-        X = sequence.pad_sequences(X, maxlen=maxlen)
-
-        if(not dtype is None):
-            X = np.array(X, dtype=dtype)
-            y = np.array(y, dtype=dtype)
-
-        return cutXY((X, y), ratio_dev_test)
 
 class LoaderUnbiased():
     '''
@@ -183,7 +128,7 @@ class LoaderUnbiased():
 
     SILVER_SIZE = 1000
 
-    def __init__(self, dataset, datapath, indexer, preprocessor=None ):
+    def __init__(self, dataset, datapath, indexer, preprocessor ):
         dataset_media, dataset_regime = dataset.split('.')
         util.assert_in(dataset_media, ['yelp', 'twitter'])
         self.dataset_media = dataset_media
@@ -208,7 +153,7 @@ class LoaderUnbiased():
                 data_str = util.xstr(data)
                 tokens = self.pp.get_tokens(data_str)
                 try:
-                    index_vectors = [self.indexer.get_index(x) for x in tokens]
+                    index_vectors = map(self.indexer.get_index, tokens)
                     X.append( index_vectors )
                     maxlen_data = max(maxlen_data, len(index_vectors))
                 except Exception as e:
@@ -225,6 +170,8 @@ class LoaderUnbiased():
         y_test = data_dict['test_data']['is_foodborne']
         z_test = data_dict['test_data']['is_biased']
         w_test = calc_train_importance_weights(z_test, data_dict['U'])
+
+        # self.pp.cache.dump()
 
         # log shapes
         logging.debug('length of X_train: {}, y_train: {}, w_train: {}, z_train: {}'.format(
@@ -252,50 +199,51 @@ class LoaderUnbiased():
 
         return ((X_train, y_train, w_train, z_train), (X_test, y_test, w_test, z_test))
 
-def load_devset_testset_index(dataset, indexpath, maxlen=None, dtype=np.float32, datapath=None):
-    util.assert_type(dataset, str)
 
-    if datapath is None:
-        if 'yelp' == dataset.split('.')[0]:
-            datapath = '~/data/hdd550-data/fbnyc/yelp_data/'
-        elif 'twitter' == dataset.split('.')[0]:
-            datapath = '~/data/hdd550-data/fbnyc/twitter_data/'
-        else:
-            logging.info('Cannot infer datapath from dataset '+dataset)
-    
-    logger.debug('loading {} data from path: {} and index: {}'.format(dataset, datapath, str(indexpath)))
-    global p, i, l
-    p = Preprocessor()
-    i = Index(indexpath, unknown_index=0)
-    l = LoaderUnbiased(dataset, datapath, i, p)
+def get_data(dataset, data_path, embeddings_path):
+    preprocessor = Preprocessor()
+    indexer = LazyIndexer()
+    loader = LoaderUnbiased(dataset, data_path, indexer, preprocessor)
 
-    (devset, testset) = l.load_data(dtype=dtype)
+    assert len(indexer._index2tokens) == 0
+    (devset, testset) = loader.load_data(dtype=np.float32)
+    assert len(indexer._index2tokens) > 0
 
-    return (devset, testset, i.index2tokens)
+    ((X, y, w, z), (X_test, y_test, w_test, z_test)) = (devset, testset)
+    logging.info("shape of training data (X, y, w, z): ({}, {}, {}, {})".format(X.shape, y.shape, w.shape, z.shape))
+    logging.info("shape of test data (X, y, w, z): ({}, {}, {}, {})".format(X_test.shape, y_test.shape, w_test.shape, z_test.shape))
+    logging.info("length of index2tokens: {}".format(len(indexer._index2tokens)))
 
-def load_embeddings_matrix(indexpath, embeddingspath):
-    logger.debug('loading yelp embeddings: '+str(locals()))
-    indexer = Index(indexpath, unknown_index=0)
-    embedder = Embeddings(embeddingspath, indexer)
-    message = 'embeddings ({}) and index ({}) size should match'.format(embedder.vocab_size, len(indexer.index2tokens))
-    assert(embedder.vocab_size == len(indexer.index2tokens)), message
+    embeddings = Embeddings(embeddings_path, indexer=indexer)
+    embeddings_matrix = embeddings.get_embeddings_matrix()
+    logging.info("shape of embeddings_matrix: {}".format(embeddings_matrix.shape))
 
-    m = np.zeros((embedder.vocab_size, embedder.size))
-    for i,w in enumerate(indexer.index2tokens):
-        m[i] = embedder.embeddings[w]
-    return m
+    return devset, testset, embeddings_matrix
 
-def test():
+
+@profile(immediate=True)
+def test2():
+    logging.basicConfig(level=logging.DEBUG, format=
+    '%(asctime)s:%(levelname)s:%(name)s:%(funcName)s:line %(lineno)d: %(message)s')
 
     dataset = 'yelp.silver'
-    indexpath = 'data/vocab_yelp_sample.txt'
-    embeddingspath = 'data/vectors_yelp_sample.txt'
-    ((X, y, w), (X_test, y_test, w_test), index2tokens) = load_devset_testset_index(dataset, indexpath)
-    logging.info("shape of training data (X, y, w): ({}, {}, {})".format(X.shape, y.shape, w.shape))
-    logging.info("shape of test data (X, y, w): ({}, {}, {})".format(X_test.shape, y_test.shape, w_test.shape))
-    logging.info("length of index2tokens: {}".format(len(index2tokens)))
-    m = load_embeddings_matrix(indexpath, embeddingspath)
-    logging.info("shape of embeddings_matrix: {}".format(m.shape))
+    data_path = '/home/yogi/data/hdd550-data/fbnyc/yelp_data'
+    embeddings_path = '/home/yogi/data/hdd550-data/fbnyc-conv/glove.840B.300d.txt'
+
+    get_data(dataset, data_path, embeddings_path)
+
+
+@profile(immediate=True)
+def test1():
+    logging.basicConfig(level=logging.DEBUG, format=
+    '%(asctime)s:%(levelname)s:%(name)s:%(funcName)s:line %(lineno)d: %(message)s')
+
+    dataset = 'twitter.silver'
+    data_path = '/home/yogi/data/hdd550-data/fbnyc/twitter_data'
+    embeddings_path = '/home/yogi/data/hdd550-data/fbnyc-conv/glove.twitter.27B.200d.txt'
+
+    get_data(dataset, data_path, embeddings_path)
+
 
 if __name__ == '__main__':
-    test()
+    test2()

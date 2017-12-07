@@ -2,6 +2,7 @@
 from .experiment_utils import *
 from .code_utils import *
 from .string_utils import *
+from .caching_utils import *
 
 def fill_dict(d1, d2):
      d22 = dict(d2)

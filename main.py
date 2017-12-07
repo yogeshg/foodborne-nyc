@@ -41,15 +41,11 @@ y_test = None
 w_test = None
 z_test = None
 
-def load_data(dataset, indexpath, embeddingspath):
+def load_data(dataset, data_path, embeddings_path):
     global embeddings_matrix, X_train, y_train, w_train, z_train, X_test, y_test, w_test, z_test
-    
-    embeddings_matrix = load.load_embeddings_matrix(indexpath, embeddingspath)
-    ((X_train, y_train, w_train, z_train),
-        (X_test, y_test, w_test, z_test), _) = load.load_devset_testset_index(dataset, indexpath)
 
-    for x in (X_train, y_train, w_train, X_test, y_test, w_test):
-        logger.debug("shape and info: "+str((x.shape, x.max(), x.min())))
+    devset, testset, embeddings_matrix = load.get_data(dataset, data_path, embeddings_path)
+    (X_train, y_train, w_train, z_train), (X_test, y_test, w_test, z_test) = devset, testset
 
 
 def save_model(hyperparams, model, get_filename):
@@ -110,6 +106,7 @@ def run_experiments(finetune, kernel_sizes, filters, lr, pooling, weight_decay, 
         lr=lr, weight_decay=weight_decay, embeddings_matrix = embeddings_matrix)
 
     hyperparams = util.fill_dict(net.hyperparameters, other_params)
+    logger.info('experiment with hyperparameters: {}'.format(json.dumps(hyperparams, sort_keys=True, indent=None)))
 
     with get_archiver(datadir='data/models', suffix="_"+commit_hash[:6]) as a1, get_archiver(datadir='data/results', suffix="_"+commit_hash[:6]) as a:
 
