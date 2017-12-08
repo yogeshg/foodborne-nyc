@@ -12,7 +12,7 @@ experiment_id = 0
 
 inputs = list(product(zip(dataset_media, data_paths, embeddings_paths), dataset_regimes))
 for hyperparameter_slice in (slice(None, -4), slice(-4, None)):
-    for (medium, data_path, embeddings_path), regime in reversed(inputs):
+    for (medium, data_path, embeddings_path), regime in inputs:
         dataset = medium + '.' + regime
         main.load_data(dataset, data_path, embeddings_path)
         other_params = {'embeddings_path': embeddings_path, 'dataset': dataset}
