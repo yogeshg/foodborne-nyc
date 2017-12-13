@@ -1,4 +1,3 @@
-import csv
 import numpy as np
 # import spacy
 from util.preprocessing import sequence
@@ -142,7 +141,7 @@ class LoaderUnbiased():
 
     def load_data(self, dtype=None, maxlen=None):
         logger.info('loading data for {} from {}'.format('.'.join([self.dataset_media, self.dataset_regime]), self.datapath))
-        from datasets.experiments.baseline_experiment_util import setup_baseline_data, calc_train_importance_weights
+        from datasets.experiments.baseline_experiment_util import setup_baseline_data, calc_importance_weights
         data_dict = setup_baseline_data(dataset=self.dataset_media, data_path=self.datapath,
                         test_regime=self.dataset_regime, train_regime=self.dataset_regime, silver_size=self.SILVER_SIZE)
 
@@ -165,11 +164,11 @@ class LoaderUnbiased():
         X_train, maxlen_train = apply_preprocess(data_dict['train_data']['text'])
         y_train = data_dict['train_data']['is_foodborne']
         z_train = data_dict['train_data']['is_biased']
-        w_train = calc_train_importance_weights(z_train, data_dict['U'])
+        w_train = calc_importance_weights(z_train, data_dict['all_B_over_U'])
         X_test, maxlen_test = apply_preprocess(data_dict['test_data']['text'])
         y_test = data_dict['test_data']['is_foodborne']
         z_test = data_dict['test_data']['is_biased']
-        w_test = calc_train_importance_weights(z_test, data_dict['U'])
+        w_test = calc_importance_weights(z_test, data_dict['all_B_over_U'])
 
         # self.pp.cache.dump()
 
