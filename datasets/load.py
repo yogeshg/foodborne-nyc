@@ -5,6 +5,7 @@ import logging
 import util
 from profilehooks import profile
 import json
+from sklearn.model_selection import StratifiedShuffleSplit
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,7 @@ class Preprocessor():
         #     self.cache[line] = tokens
         # else:
         #     tokens = self.cache[line]
-        tokens = [x.text for x in self.sp(util.xuni(line)) if x.pos_!='PUNCT']
+        tokens = [x.text.lower() for x in self.sp(util.xuni(line)) if x.pos_!='PUNCT']
         return tokens
 
     def get_preprocessed(self, line):
@@ -126,6 +127,8 @@ class LoaderUnbiased():
     '''
 
     SILVER_SIZE = 1000
+    TEST_SPLIT_DATE_STR = None
+    VALIDATION_SPLIT = 0.2
 
     def __init__(self, dataset, datapath, indexer, preprocessor ):
         dataset_media, dataset_regime = dataset.split('.')
@@ -139,11 +142,13 @@ class LoaderUnbiased():
             self.pp = Preprocessor()
         self.indexer = indexer
 
-    def load_data(self, dtype=None, maxlen=None):
+    def load_data(self, dtype=np.float32, maxlen=None):
         logger.info('loading data for {} from {}'.format('.'.join([self.dataset_media, self.dataset_regime]), self.datapath))
         from datasets.experiments.baseline_experiment_util import setup_baseline_data, calc_importance_weights
-        data_dict = setup_baseline_data(dataset=self.dataset_media, data_path=self.datapath,
-                        test_regime=self.dataset_regime, train_regime=self.dataset_regime, silver_size=self.SILVER_SIZE)
+        data_dict = setup_baseline_data(
+            dataset=self.dataset_media, data_path=self.datapath,
+            test_regime=self.dataset_regime, train_regime=self.dataset_regime,
+            silver_size=self.SILVER_SIZE, test_split_date_str=self.TEST_SPLIT_DATE_STR)
 
         def apply_preprocess(data_x):
             X = []
@@ -160,44 +165,57 @@ class LoaderUnbiased():
                     logger.exception(e)
             return (X, maxlen_data)
 
-        # create all data vectors, {X, y, w} for {train, test}
-        X_train, maxlen_train = apply_preprocess(data_dict['train_data']['text'])
-        y_train = data_dict['train_data']['is_foodborne']
-        z_train = data_dict['train_data']['is_biased']
-        w_train = calc_importance_weights(z_train, data_dict['all_B_over_U'])
-        X_test, maxlen_test = apply_preprocess(data_dict['test_data']['text'])
-        y_test = data_dict['test_data']['is_foodborne']
-        z_test = data_dict['test_data']['is_biased']
-        w_test = calc_importance_weights(z_test, data_dict['all_B_over_U'])
+        # create all data vectors, {X, y, w} for {training, validation, testing}
+        # dev = train + valid
+        X_dev, maxlen_dev = apply_preprocess(data_dict['train_data']['text'])
+        y_dev = data_dict['train_data']['is_foodborne']
+        z_dev = data_dict['train_data']['is_biased']
+
+        X_testing, maxlen_testing = apply_preprocess(data_dict['test_data']['text'])
+        y_testing = data_dict['test_data']['is_foodborne']
+        z_testing = data_dict['test_data']['is_biased']
+        w_testing = calc_importance_weights(z_testing, data_dict['all_B_over_U'])
 
         # self.pp.cache.dump()
 
-        # log shapes
-        logging.debug('length of X_train: {}, y_train: {}, w_train: {}, z_train: {}'.format(
-            len(X_train), len(y_train), len(w_train), len(z_train)))
-        logging.debug('length of X_test: {}, y_test: {}, w_test: {}, z_test: {}'.format(
-            len(X_test), len(y_test), len(w_test), len(z_test)))
-
         # apply transformations
         if(maxlen is None):
-            maxlen = max(maxlen_train, maxlen_test)
-        X_train = sequence.pad_sequences(X_train, maxlen=maxlen)
-        X_test = sequence.pad_sequences(X_test, maxlen=maxlen)
+            maxlen = max(maxlen_dev, maxlen_testing)
 
-        # make them numpy arrays of a certains dtype iff specified
-        if(not dtype is None):
-            X_train = np.array(X_train, dtype=dtype)
-            y_train = np.array(y_train, dtype=dtype)
-            w_train = np.array(w_train, dtype=dtype)
-            z_train = np.array(z_train, dtype=dtype)
+        X_dev = sequence.pad_sequences(X_dev, maxlen=maxlen)
+        X_testing = sequence.pad_sequences(X_testing, maxlen=maxlen)
 
-            X_test = np.array(X_test, dtype=dtype)
-            y_test = np.array(y_test, dtype=dtype)
-            w_test = np.array(w_test, dtype=dtype)
-            z_test = np.array(z_test, dtype=dtype)
+        # make them numpy arrays of a certain dtype
+        X_dev = np.array(X_dev, dtype=dtype)
+        y_dev = np.array(y_dev, dtype=dtype)
+        z_dev = np.array(z_dev, dtype=dtype)
 
-        return ((X_train, y_train, w_train, z_train), (X_test, y_test, w_test, z_test))
+        X_testing = np.array(X_testing, dtype=dtype)
+        y_testing = np.array(y_testing, dtype=dtype)
+        z_testing = np.array(z_testing, dtype=dtype)
+        w_testing = np.array(w_testing, dtype=dtype)
 
+        folds = StratifiedShuffleSplit(n_splits=1, test_size=self.VALIDATION_SPLIT, random_state=1991)
+        label_bias_tuples = ['{},{}'.format(y, b) for y, b in zip(y_dev, z_dev)]
+        training_idx, validation_idx = list(folds.split(np.zeros(len(z_dev)), label_bias_tuples))[0]
+
+        X_training = X_dev[training_idx]
+        y_training = y_dev[training_idx]
+        z_training = z_dev[training_idx]
+        w_training = calc_importance_weights(z_training, data_dict['all_B_over_U'])
+        w_training = np.array(w_training, dtype=dtype)
+
+        X_validation = X_dev[validation_idx]
+        y_validation = y_dev[validation_idx]
+        z_validation = z_dev[validation_idx]
+        w_validation = calc_importance_weights(z_validation, data_dict['all_B_over_U'])
+        w_validation = np.array(w_validation, dtype=dtype)
+
+        return (
+            (X_training, y_training, w_training, z_training),
+            (X_validation, y_validation, w_validation, z_validation),
+            (X_testing, y_testing, w_testing, z_testing)
+        )
 
 def get_data(dataset, data_path, embeddings_path):
     preprocessor = Preprocessor()
@@ -205,19 +223,22 @@ def get_data(dataset, data_path, embeddings_path):
     loader = LoaderUnbiased(dataset, data_path, indexer, preprocessor)
 
     assert len(indexer._index2tokens) == 0
-    (devset, testset) = loader.load_data(dtype=np.float32)
+    (training_set, validation_set, testing_set) = loader.load_data(dtype=np.float32)
     assert len(indexer._index2tokens) > 0
 
-    ((X, y, w, z), (X_test, y_test, w_test, z_test)) = (devset, testset)
-    logging.info("shape of training data (X, y, w, z): ({}, {}, {}, {})".format(X.shape, y.shape, w.shape, z.shape))
-    logging.info("shape of test data (X, y, w, z): ({}, {}, {}, {})".format(X_test.shape, y_test.shape, w_test.shape, z_test.shape))
+    shapes_of_dataset = lambda (X1, y1, w1, z1): (X1.shape, y1.shape, w1.shape, z1.shape)
+    message  = "shape of {} data (X, y, w, z): {}"
+    logging.info(message.format('training', shapes_of_dataset(training_set)))
+    logging.info(message.format('validation', shapes_of_dataset(validation_set)))
+    logging.info(message.format('testing', shapes_of_dataset(testing_set)))
+
     logging.info("length of index2tokens: {}".format(len(indexer._index2tokens)))
 
     embeddings = Embeddings(embeddings_path, indexer=indexer)
     embeddings_matrix = embeddings.get_embeddings_matrix()
     logging.info("shape of embeddings_matrix: {}".format(embeddings_matrix.shape))
 
-    return devset, testset, embeddings_matrix
+    return training_set, validation_set, testing_set, embeddings_matrix
 
 
 @profile(immediate=True)
@@ -245,4 +266,5 @@ def test1():
 
 
 if __name__ == '__main__':
+    test1()
     test2()

@@ -16,7 +16,6 @@ from torchvision import datasets, transforms
 from torch.autograd import Variable
 from torch.utils.data import TensorDataset, DataLoader
 
-from sklearn.model_selection import StratifiedShuffleSplit
 
 import datasets.experiments.baseline_experiment_util as beutil
 import util as u
@@ -128,9 +127,7 @@ def fit(*pargs, **kwargs):
     args.net.cuda()
 
     history = []
-    folds = StratifiedShuffleSplit(n_splits=1, test_size=args.validation_split, random_state=1991)
-    label_bias_tuples = ['{},{}'.format(y,b) for y,b in zip(args.y, args.z)]
-    training_idx, validation_idx = list(folds.split(np.zeros(len(args.z)), label_bias_tuples))[0]
+
     train_loader = get_loader(args.X, args.y, args.w, args.z, training_idx, args.batch_size)
     valid_loader = get_loader(args.X, args.y, args.w, args.z, validation_idx, args.batch_size)
 
