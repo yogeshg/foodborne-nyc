@@ -249,10 +249,14 @@ class LoaderUnbiased():
         w_testing = np.array(w_testing, dtype=dtype)
 
         folds = StratifiedShuffleSplit(n_splits=1, test_size=self.VALIDATION_SPLIT, random_state=1991)
-        label_bias_tuples = ['{},{}'.format(y, b) for y, b in zip(y_dev, z_dev)]
-        counter = Counter(label_bias_tuples)
-        logger.info("\n".join( t+": "+str(c) for t, c in counter.items()))
-        training_idx, validation_idx = list(folds.split(np.zeros(len(z_dev)), label_bias_tuples))[0]
+        biased_label_tuples = ['{},{}'.format(b, y) for b, y in zip(z_dev, y_dev)]
+        counter = Counter(biased_label_tuples)
+        for t, c in counter.items():
+            logger.info("label bias tuples count:" + t + ": "+str(c))
+        if(min(map(lambda x: x[1], counter.items())) < 2):
+            logger.warn("found a class with 1 item only, trying to sparsify on biased alone")
+            biased_label_tuples = ['{},{}'.format(b, "_") for b, y in zip(z_dev, y_dev)]
+        training_idx, validation_idx = list(folds.split(np.zeros(len(z_dev)), biased_label_tuples))[0]
 
         X_training = X_dev[training_idx]
         y_training = y_dev[training_idx]

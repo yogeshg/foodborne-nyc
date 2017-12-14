@@ -99,13 +99,13 @@ def get_loader(data_set, batch_size):
     return loader
 
 
-def get_metrics(y_predicted_probs, y_true, is_biased):
+def get_metrics(y_predicted_probs, y_true, weights):
     precision, recall = beutil.importance_weighted_precision_recall(
-        y_true, y_predicted_probs, is_biased.astype(bool), 0.5)
+        y_true, y_predicted_probs, weights, 0.5)
 
     f1 = 2 * precision * recall / (precision + recall + 1e-15)
 
-    precisions, recalls, _ = beutil.importance_weighted_pr_curve(y_true, y_predicted_probs, is_biased.astype(bool))
+    precisions, recalls, _ = beutil.importance_weighted_pr_curve(y_true, y_predicted_probs, weights)
     aupr = beutil.area_under_pr_curve(precisions, recalls)
 
     logging.debug('\npost_training_precision:{}\npost_training_recall:{}'.format(
@@ -142,7 +142,7 @@ def fit(*pargs, **kwargs):
             training_loss = torch.FloatTensor(np.array([0.0])).cuda()
             all_y_true = None
             all_y_prob = None
-            all_is_biased = None
+            all_weights = None
 
             args.net.train()
             for i, (_X, (_ywz)) in enumerate(train_loader):
@@ -171,13 +171,13 @@ def fit(*pargs, **kwargs):
                 if i == 0:
                     all_y_true = _y.cpu().numpy()
                     all_y_prob = yp.data.cpu().numpy()
-                    all_is_biased = _z.numpy()
+                    all_weights = _w.numpy()
 
                 else:  # assuming tensor shape is [batch size, 1] (but this might not be quite right)
                     # logging.info('old: {}, update: {}'.format(all_y_prob.shape, yp.data.cpu().numpy().shape))
                     all_y_true = np.concatenate((all_y_true, _y.cpu().numpy()), axis=0)
                     all_y_prob = np.concatenate((all_y_prob, yp.data.cpu().numpy()), axis=0)
-                    all_is_biased = np.concatenate((all_is_biased, _z.numpy()), axis=0)
+                    all_weights = np.concatenate((all_weights, _w.numpy()), axis=0)
 
 
                 # backward
@@ -189,12 +189,12 @@ def fit(*pargs, **kwargs):
                 u.log_frequently(1, i, logger.debug, '{}-th batch training with size {}'.format(i, y.size()))
 
             training_f1, training_precision, training_recall, training_aupr = get_metrics(
-                all_y_prob, all_y_true, all_is_biased)
+                all_y_prob, all_y_true, all_weights)
 
             validation_loss = torch.FloatTensor(np.array([0.0])).cuda()
             all_y_true = None
             all_y_prob = None
-            all_is_biased = None
+            all_weights = None
 
             args.net.eval()
             for i, (_X, _ywz) in enumerate(valid_loader):
@@ -215,18 +215,18 @@ def fit(*pargs, **kwargs):
                 if i == 0:
                     all_y_true = _y.cpu().numpy()
                     all_y_prob = yp.data.cpu().numpy()
-                    all_is_biased = _z.numpy()
+                    all_weights = _w.numpy()
 
                 else:  # assuming tensor shape is [batch size, 1] (but this might not be quite right)
                     # logging.info('old: {}, update: {}'.format(all_y_prob.shape, yp.data.cpu().numpy().shape))
                     all_y_true = np.concatenate((all_y_true, _y.cpu().numpy()), axis=0)
                     all_y_prob = np.concatenate((all_y_prob, yp.data.cpu().numpy()), axis=0)
-                    all_is_biased = np.concatenate((all_is_biased, _z.numpy()), axis=0)
+                    all_weights = np.concatenate((all_weights, _w.numpy()), axis=0)
 
                 u.log_frequently(10, i, logger.debug, '{}-th batch validating with size {}'.format(i, y.size()))
 
             validation_f1, validation_precision, validation_recall, validation_aupr = get_metrics(
-                all_y_prob, all_y_true, all_is_biased)
+                all_y_prob, all_y_true, all_weights)
 
             record = (('loss', training_loss.cpu().numpy()[0]),)\
                      + (('precision', training_precision), ('recall', training_recall))\
