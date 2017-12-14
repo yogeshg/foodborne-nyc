@@ -6,6 +6,10 @@ import util
 from profilehooks import profile
 import json
 from sklearn.model_selection import StratifiedShuffleSplit
+from collections import Counter
+from collections import namedtuple
+import csv
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +30,42 @@ class LazyIndexer():
             return 'NONE'
         else:
             return self._index2tokens[index]
+
+
+class Indexer:
+
+    def __init__(self, dataset):
+        self.name = dataset
+        self._index2tokens = []
+        self._tokens2index = {}
+        self._tokens_counter = Counter()
+        self._adding_words = True
+        self.frequency_threshold = 5
+
+    def add_word(self, token):
+        assert(self._adding_words)
+        self._tokens_counter[token] += 1
+
+    def make_index(self):
+        self._adding_words = False
+        tokens_freqeuncy = sorted(self._tokens_counter.items(), key=lambda x:(-x[1], x[0]))
+        self._index2tokens = map(lambda x: x[0], filter(lambda x: x[1]>self.frequency_threshold, tokens_freqeuncy))
+        self._index2tokens.append('<UNK>')
+        self._tokens2index = {token:index for index, token in enumerate(self._index2tokens)}
+        with open('stats/indexer.freqeuncy.{}.csv'.format(self.name), 'w') as f:
+            writer = csv.writer(f, lineterminator=os.linesep)
+            writer.writerows(tokens_freqeuncy)
+
+    def get_index(self, token):
+        assert not self._adding_words
+        if self._tokens2index.has_key(token):
+            return self._tokens2index[token]
+        else:
+            return self._tokens2index['<UNK>']
+
+    def get_token(self, index):
+        return self._index2tokens[index]
+
 
  
 class Preprocessor():
@@ -59,8 +99,9 @@ class Preprocessor():
 
 class Embeddings():
 
-    def __init__(self, path, indexer, head = None):
-        assert isinstance(indexer, LazyIndexer)
+    def __init__(self, path, indexer, dataset, head = None):
+        assert isinstance(indexer, Indexer)
+        self.name = dataset
         self.path = path
         self.indexer = indexer
         self._head = head
@@ -112,9 +153,13 @@ class Embeddings():
 
         logger.info('embeddings found for {}/{} tokens, not found for {}'.format(
             num_embeddings_found, vocab_size, num_embeddings_not_found))
-        with open('.embeddings.notfound.json', 'w') as f:
-            json.dump({'embeddings_not_found': map(str, embeddings_not_found)}, f, indent=0)
+        with open('stats/embeddings.notfound.{}.csv'.format(self.name), 'w') as f:
+            writer = csv.writer(f, lineterminator=os.linesep)
+            writer.writerows(map(lambda x: (str(x),), sorted(embeddings_not_found)))
         return embeddings_matrix
+
+
+DataSet = namedtuple('Dataset', ['X', 'y', 'z', 'w'])
 
 
 class LoaderUnbiased():
@@ -128,7 +173,7 @@ class LoaderUnbiased():
 
     SILVER_SIZE = 1000
     TEST_SPLIT_DATE_STR = None
-    VALIDATION_SPLIT = 0.2
+    VALIDATION_SPLIT = 0.1
 
     def __init__(self, dataset, datapath, indexer, preprocessor ):
         dataset_media, dataset_regime = dataset.split('.')
@@ -150,31 +195,39 @@ class LoaderUnbiased():
             test_regime=self.dataset_regime, train_regime=self.dataset_regime,
             silver_size=self.SILVER_SIZE, test_split_date_str=self.TEST_SPLIT_DATE_STR)
 
-        def apply_preprocess(data_x):
+        def data_to_tokens(data_x):
             X = []
             maxlen_data = 0
             for data in data_x: 
                 data_str = util.xstr(data)
                 tokens = self.pp.get_tokens(data_str)
-                try:
-                    index_vectors = map(self.indexer.get_index, tokens)
-                    X.append( index_vectors )
-                    maxlen_data = max(maxlen_data, len(index_vectors))
-                except Exception as e:
-                    logger.info(str(tokens))
-                    logger.exception(e)
+                map(self.indexer.add_word, tokens)
+                X.append(tokens)
+                maxlen_data = max(maxlen_data, len(tokens))
             return (X, maxlen_data)
+
+        def tokens_to_indices(data_x):
+            X = []
+            for tokens in data_x:
+                indices = map(self.indexer.get_index, tokens)
+                X.append(indices)
+            return X
 
         # create all data vectors, {X, y, w} for {training, validation, testing}
         # dev = train + valid
-        X_dev, maxlen_dev = apply_preprocess(data_dict['train_data']['text'])
+        X_dev, maxlen_dev = data_to_tokens(data_dict['train_data']['text'])
         y_dev = data_dict['train_data']['is_foodborne']
         z_dev = data_dict['train_data']['is_biased']
 
-        X_testing, maxlen_testing = apply_preprocess(data_dict['test_data']['text'])
+        X_testing, maxlen_testing = data_to_tokens(data_dict['test_data']['text'])
         y_testing = data_dict['test_data']['is_foodborne']
         z_testing = data_dict['test_data']['is_biased']
         w_testing = calc_importance_weights(z_testing, data_dict['all_B_over_U'])
+
+        self.indexer.make_index()
+
+        X_dev = tokens_to_indices(X_dev)
+        X_testing = tokens_to_indices(X_testing)
 
         # self.pp.cache.dump()
 
@@ -197,6 +250,8 @@ class LoaderUnbiased():
 
         folds = StratifiedShuffleSplit(n_splits=1, test_size=self.VALIDATION_SPLIT, random_state=1991)
         label_bias_tuples = ['{},{}'.format(y, b) for y, b in zip(y_dev, z_dev)]
+        counter = Counter(label_bias_tuples)
+        logger.info("\n".join( t+": "+str(c) for t, c in counter.items()))
         training_idx, validation_idx = list(folds.split(np.zeros(len(z_dev)), label_bias_tuples))[0]
 
         X_training = X_dev[training_idx]
@@ -212,14 +267,21 @@ class LoaderUnbiased():
         w_validation = np.array(w_validation, dtype=dtype)
 
         return (
-            (X_training, y_training, w_training, z_training),
-            (X_validation, y_validation, w_validation, z_validation),
-            (X_testing, y_testing, w_testing, z_testing)
+            DataSet(X_training, y_training, w_training, z_training),
+            DataSet(X_validation, y_validation, w_validation, z_validation),
+            DataSet(X_testing, y_testing, w_testing, z_testing)
         )
 
 def get_data(dataset, data_path, embeddings_path):
+    """
+
+    :param dataset: str
+    :param data_path: str
+    :param embeddings_path: str
+    :return: tuple
+    """
     preprocessor = Preprocessor()
-    indexer = LazyIndexer()
+    indexer = Indexer(dataset)
     loader = LoaderUnbiased(dataset, data_path, indexer, preprocessor)
 
     assert len(indexer._index2tokens) == 0
@@ -234,7 +296,7 @@ def get_data(dataset, data_path, embeddings_path):
 
     logging.info("length of index2tokens: {}".format(len(indexer._index2tokens)))
 
-    embeddings = Embeddings(embeddings_path, indexer=indexer)
+    embeddings = Embeddings(embeddings_path, indexer, dataset)
     embeddings_matrix = embeddings.get_embeddings_matrix()
     logging.info("shape of embeddings_matrix: {}".format(embeddings_matrix.shape))
 

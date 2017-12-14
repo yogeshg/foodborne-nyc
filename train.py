@@ -12,11 +12,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torchvision import datasets, transforms
 from torch.autograd import Variable
 from torch.utils.data import TensorDataset, DataLoader
 
-
+import datasets.load
 import datasets.experiments.baseline_experiment_util as beutil
 import util as u
 
@@ -69,24 +68,28 @@ class AfterEpoch():
         return False
 
 
-FitArgs = namedtuple('FitArgs', ['net', 'X', 'y', 'w', 'z', 'batch_size', 'epochs', 'validation_split', 'callbacks', 'optimizer'])
+FitArgs = namedtuple('FitArgs', ['net', 'training_set', 'validation_set', 'batch_size', 'epochs', 'validation_split', 'callbacks', 'optimizer'])
 AdamConfig = namedtuple('AdamConfig', ['lr', 'beta_1', 'beta_2', 'epsilon', 'weight_decay'])
 FitReturn = namedtuple('FitReturn', ['history', 'params'])
 
 
-def get_loader(x, y, w, z, idx, batch_size):
-    logger.debug('getting loader for matrices of size:{}, num:{}'.format(x.shape[0], len(idx)))
-    assert x.shape[0] == y.shape[0] == w.shape[0] == z.shape[0]
+def get_loader(data_set, batch_size):
+    assert isinstance(data_set, datasets.load.DataSet)
+    assert isinstance(batch_size, int)
+
+    logger.debug('getting loader for matrices of size:{}'.format(data_set.X.shape[0]))
+    assert data_set.X.shape[0] == data_set.y.shape[0] == data_set.w.shape[0] == data_set.z.shape[0]
     logging.debug('loading data with shapes: {} {} {} {}'.format(
-        x.shape, y.shape, w.shape, z.shape
+        data_set.X.shape, data_set.y.shape, data_set.w.shape, data_set.z.shape
     ))
 
-    x_tensor = torch.LongTensor(x[idx])
+    x_tensor = torch.LongTensor(data_set.X)
 
     def reshape_n_n1(x):
         return x.reshape((x.shape[0], 1))
 
-    ywz_tensor = torch.FloatTensor(np.concatenate((reshape_n_n1(y[idx]), reshape_n_n1(w[idx]), reshape_n_n1(z[idx])), axis=1))
+    ywz_data = np.concatenate((reshape_n_n1(data_set.y), reshape_n_n1(data_set.w), reshape_n_n1(data_set.z)), axis=1)
+    ywz_tensor = torch.FloatTensor(ywz_data)
 
     logging.debug('size of x_tensor: {}'.format(x_tensor.shape))
     logging.debug('size of ywz_tensor: {}'.format(ywz_tensor.shape))
@@ -128,8 +131,8 @@ def fit(*pargs, **kwargs):
 
     history = []
 
-    train_loader = get_loader(args.X, args.y, args.w, args.z, training_idx, args.batch_size)
-    valid_loader = get_loader(args.X, args.y, args.w, args.z, validation_idx, args.batch_size)
+    train_loader = get_loader(args.training_set, args.batch_size)
+    valid_loader = get_loader(args.validation_set, args.batch_size)
 
     try:
         for epoch in range(args.epochs):

@@ -28,25 +28,18 @@ from datasets import load
 
 import models
 import train
-# from train import EarlyStopping, ModelCheckpoint, CSVLogger
 
 # Global Variables
 embeddings_matrix = None
-X_train = None
-y_train = None
-w_train = None
-z_train = None
-X_test = None
-y_test = None
-w_test = None
-z_test = None
+
+training_set = None
+validation_set = None
+testing_set = None
 
 def load_data(dataset, data_path, embeddings_path):
-    global embeddings_matrix, X_train, y_train, w_train, z_train, X_test, y_test, w_test, z_test
-
-    devset, testset, embeddings_matrix = load.get_data(dataset, data_path, embeddings_path)
-    (X_train, y_train, w_train, z_train), (X_test, y_test, w_test, z_test) = devset, testset
-
+    global embeddings_matrix, training_set, validation_set, testing_set
+    all_data = load.get_data(dataset, data_path, embeddings_path)
+    training_set, validation_set, testing_set, embeddings_matrix = all_data
 
 def save_model(hyperparams, model, get_filename):
     '''
@@ -70,8 +63,6 @@ def save_model(hyperparams, model, get_filename):
             sys.stdout.write(str(model))
     sys.stdout = stdout
 
-    # util.plot_model(model, to_file=get_filename('model.png'), show_shapes=True, show_layer_names=True)
-
     return
 
 def save_history(history, dirpath):
@@ -94,8 +85,7 @@ def save_history(history, dirpath):
 
 # main
 def run_experiments(finetune, kernel_sizes, filters, lr, pooling, weight_decay, other_params):
-    global embeddings_matrix, X_train, y_train, w_train, z_train
-    #removing global X_test, y_test, w_test, z_test
+    global embeddings_matrix, training_set, validation_set
 
     other_params['commit_hash'] = commit_hash
 
@@ -120,7 +110,7 @@ def run_experiments(finetune, kernel_sizes, filters, lr, pooling, weight_decay, 
                                        beta_2=net.hyperparameters['beta_2'], epsilon=net.hyperparameters['epsilon'],
                                        weight_decay=net.hyperparameters['weight_decay'])
 
-        history = train.fit(net, X_train, y_train, w_train, z_train,
+        history = train.fit(net, training_set, validation_set,
                             batch_size=c.batch_size, epochs=c.epochs, validation_split=0.2,
                             callbacks = [early_stopping, model_checkpoint, csv_logger], optimizer=adam_config)
 

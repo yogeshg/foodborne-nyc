@@ -12,13 +12,13 @@ experiment_id = 0
 
 inputs = list(product(zip(dataset_media, data_paths, embeddings_paths), dataset_regimes))
 for hyperparameter_slice in (slice(None, -4), slice(-4, None)):
-    for (medium, data_path, embeddings_path), regime in inputs:
+    for (medium, data_path, embeddings_path), regime in reversed(inputs):
         dataset = medium + '.' + regime
         main.load_data(dataset, data_path, embeddings_path)
         other_params = {'embeddings_path': embeddings_path, 'dataset': dataset}
 
-        kernel_sizes_choices = ((1,2), (1,2,3), (1,2,3,4), (1,2,3,4,5))
-        filters_choices = (5, 10, 20, 25, 50, 75, 100)
+        kernel_sizes_choices = ((1,2), (1,2,3))
+        filters_choices = (5, 10, 20)
         num_params = lambda h: sum(h[0]) * h[1]
 
         hyperparameter_choices = sorted(product(kernel_sizes_choices, filters_choices), key=num_params)
@@ -32,4 +32,3 @@ for hyperparameter_slice in (slice(None, -4), slice(-4, None)):
                                  weight_decay=0.001, other_params=other_params)
             except Exception, e:
                 logger.exception(e)
-
