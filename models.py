@@ -197,7 +197,7 @@ class Net(nn.Module):
         return x
 
 
-def forward_inspect(self, X0):
+def forward_inspect(self, X0, indexer):
     # logger.debug("activations size: {}".format(x.size()))
 
     # X0.shape
@@ -246,7 +246,7 @@ def forward_inspect(self, X0):
             ngram = sentence[ngram_location]
             ngrams_interest.append((ngram_location, interest, ngram))
             ngrams_map[tuple(ngram)] += interest
-        print(json.dumps({str(k):v for k, v in ngrams_map.items()}, indent=0))
+        print(json.dumps({indexer.get_token(k):v for k, v in ngrams_map.items()}, indent=0))
 
     # 3. Apply pooling, activations
     if (self.conv1_stack_pooling == 'max'):
