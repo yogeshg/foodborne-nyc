@@ -7,6 +7,9 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.autograd import Variable
+import math
+from collections import Counter
+import pandas as pd
 
 import numpy as np
 import logging
@@ -15,9 +18,11 @@ logger = logging.getLogger(__name__)
 
 import util
 
+def equal_pad(kernel_size):
+    return ((kernel_size + 1) // 2, kernel_size // 2)
 
 def get_conv_stack(dimensions, filters, kernel_sizes, dropout_rate):
-    pads = [nn.ConstantPad1d(((i + 1) // 2, i // 2), 0) for i in kernel_sizes]
+    pads = [nn.ConstantPad1d(equal_pad(i), 0) for i in kernel_sizes]
     convs = [nn.Conv1d(dimensions, filters, i) for i in kernel_sizes]
     drops = [nn.Dropout(p=dropout_rate) for i in kernel_sizes]
     return zip(pads, convs, drops)
@@ -191,6 +196,117 @@ class Net(nn.Module):
         x = self.fc(x.view(x.size()[0], -1))
         # logger.debug("activations size: {}".format(x.size()))
         return x
+
+
+def forward_inspect(self, X0, indexer):
+    # logger.debug("activations size: {}".format(x.size()))
+
+    # X0.shape
+    # torch.Size([64, 36])
+    X0_data = X0.cpu().data.numpy()
+
+    # 1. Apply Embeddings
+    X1 = self.embeddings(X0)
+
+    # X1.shape
+    # torch.Size([64, 36, 200])
+    activations_embeddings= X1.norm(dim=2).cpu().data.numpy()
+    argmax_embeddings = activations_embeddings.argmax(axis=1)
+
+    # logger.debug("activations size: {}".format(x.size()))
+
+    # 2. Apply Convolutions
+    def compose_stack(x, pad, conv, drop):
+        pad1_i = getattr(self, pad)
+        conv1_i = getattr(self, conv)
+        drop1_i = getattr(self, drop)
+        y = drop1_i(conv1_i(pad1_i(x)))
+        # logger.debug("activations size: {}".format(x.size()))
+        return y
+
+    stack_layer_names = zip(self.pad1_layers, self.conv1_layers, self.drop1_layers)
+    stack_layers = [compose_stack(X1.transpose(1, 2), pad, conv, drop) for pad, conv, drop in stack_layer_names]
+    X2 = torch.cat(stack_layers, dim=1)
+    # logger.debug("activations size: {}".format(x.size()))
+
+    # X2.shape
+    # torch.Size([64, 60, 37])
+    activations_conv = X2.cpu().data.numpy()
+    ngrams_heatmaps = []
+    ngrams_interest = []
+    for i, activations_conv_i in enumerate(activations_conv):
+        ngrams_interest.append([])
+        ngrams_map = Counter()
+        for j, activations_conv_i_j in enumerate(activations_conv_i):
+            # activation for i-th data point, j-th convolutional filter
+            jj = j // self.hyperparameters['filters']
+            kernel_size = self.hyperparameters['kernel_sizes'][jj]
+            pre, post = equal_pad(kernel_size)
+            sentence = X0_data[i]
+            argmax_conv_i_j = activations_conv_i_j.argmax()
+            interest = activations_conv_i_j.max()
+            ngram_location = slice(max(0, argmax_conv_i_j - pre), min(len(sentence), argmax_conv_i_j + post))
+            ngram = sentence[ngram_location]
+            ngrams_interest[-1].append((ngram_location, interest, ngram))
+            ngrams_map[tuple(ngram)] += interest
+        ngrams_heatmap = [("_".join(map(indexer.get_token, k)), v) for k, v in ngrams_map.items()]
+        # print(ngrams_heatmap)
+        print(" ".join(map(indexer.get_token, sentence)))
+        for k, v in (sorted(ngrams_heatmap, key=lambda x: x[1])):
+            print("{}:\t{}".format(v, k))
+        ngrams_heatmaps.append(ngrams_heatmap)
+
+    # 3. Apply pooling, activations
+    if (self.conv1_stack_pooling == 'max'):
+        X31 = F.max_pool1d(X2, X2.size()[-1])
+        # logger.debug("activations size: {}".format(x.size()))
+        X3 = X31.transpose(1, 2)
+    elif (self.conv1_stack_pooling == 'average'):
+        X31 = F.avg_pool1d(X2, X2.size()[-1])
+        # logger.debug("activations size: {}".format(x.size()))
+        X3 = X31.transpose(1, 2)
+    elif (self.conv1_stack_pooling == 'logsumexp'):
+        X31 = log_sum_exp(X2, dim=2, keepdim=True)
+        # logger.debug("activations size: {}".format(x.size()))
+        X3 = X31.transpose(1, 2)
+    else:
+        raise RuntimeError, 'Unexpected pooling', self.conv1_stack_pooling
+
+    if (self.conv1_stack_activation == 'relu'):
+        X4 = F.relu(X3)
+    else:
+        raise RuntimeError, 'Unexpected activation', self.conv1_stack_activation
+
+    # logger.debug("activations size: {}".format(x.size()))
+
+    # 4. Apply fully connected layer
+    X5 = self.fc(X4.view(X4.size()[0], -1))
+    # logger.debug("activations size: {}".format(x.size()))
+
+    (weights, bias) = map(lambda x: x.cpu().data.numpy(), self.fc.parameters())
+    print(weights, bias)
+
+    return X5, weights, bias, ngrams_interest
+
+def get_results(indexer, idx, X5, weights, bias, ngrams_interest):
+
+    print("logit (sick): " + str(X5[idx]))
+    print("bias: " + str(bias))
+
+    df = pd.DataFrame({
+        'weights': weights[0],
+        'activation': map(lambda x: x[1], ngrams_interest[idx]),
+        'indices': map(lambda x: x[2], ngrams_interest[idx]),
+    })
+
+    indices2ngram = lambda indices: "_".join(map(indexer.get_token, indices))
+    df.loc[:, 'ngram'] = map(indices2ngram, df.indices)
+    df.loc[:, 'partial'] = df.weights * df.activation
+    df = df.sort_values(by='partial', ascending=False)
+
+    print("partial sum: "+str(df.partial.sum()))
+
+    return df
 
 
 def get_params_list(net, trainable_only=True):

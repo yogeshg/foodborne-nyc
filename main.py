@@ -31,15 +31,17 @@ import train
 
 # Global Variables
 embeddings_matrix = None
+indexer = None
 
 training_set = None
 validation_set = None
 testing_set = None
 
 def load_data(dataset, data_path, embeddings_path):
-    global embeddings_matrix, training_set, validation_set, testing_set
+    global embeddings_matrix, indexer, training_set, validation_set, testing_set
     all_data = load.get_data(dataset, data_path, embeddings_path)
-    training_set, validation_set, testing_set, embeddings_matrix = all_data
+    training_set, validation_set, testing_set, embeddings_matrix, indexer = all_data
+
 
 def save_model(hyperparams, model, get_filename):
     '''

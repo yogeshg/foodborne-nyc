@@ -316,7 +316,7 @@ def get_data(dataset, data_path, embeddings_path):
     embeddings_matrix = embeddings.get_embeddings_matrix()
     logging.info("shape of embeddings_matrix: {}".format(embeddings_matrix.shape))
 
-    return training_set, validation_set, testing_set, embeddings_matrix
+    return training_set, validation_set, testing_set, embeddings_matrix, indexer
 
 
 @profile(immediate=True)
