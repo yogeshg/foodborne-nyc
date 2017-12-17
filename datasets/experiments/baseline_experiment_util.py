@@ -133,7 +133,9 @@ def setup_baseline_data(train_regime='gold',
         biased_csv = validate(rename(normalize(biased)))
         unbiased_csv = validate(rename(normalize(unbiased), is_foodborne_map=defaultdict(int)))
 
-        all_B_over_U = len(biased) / float(len(unbiased) + len(biased))
+        all_B_over_U = len(biased) / float(5952760)
+        # This is because the 'U' that we're using is actually only a sample from the DOHMH servers.
+        # For twitter, we hard code the 'U' used in calculating all_B_over_U to 5,952,760.
 
         (old_biased, new_biased) = split(biased_csv, test_split_date)
         (old_unbiased, new_unbiased) = split(unbiased_csv, test_split_date)

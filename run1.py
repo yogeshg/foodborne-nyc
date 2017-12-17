@@ -18,8 +18,8 @@ for hyperparameter_slice in (slice(None, -4), slice(-4, None)):
             main.load_data(dataset, data_path, embeddings_path)
             other_params = {'embeddings_path': embeddings_path, 'dataset': dataset}
 
-            kernel_sizes_choices = ((1,2), (1,2,3))
-            filters_choices = (5, 10, 20)
+            kernel_sizes_choices = ((1,2), (1,2,3), (1,2,3,4), (1,2,3,4,5))
+            filters_choices = (5, 10, 20, 25, 50, 75, 100)
             num_params = lambda h: sum(h[0]) * h[1]
 
             hyperparameter_choices = sorted(product(kernel_sizes_choices, filters_choices), key=num_params)

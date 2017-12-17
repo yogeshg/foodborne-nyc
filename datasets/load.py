@@ -50,11 +50,15 @@ class Indexer:
         self._adding_words = False
         tokens_freqeuncy = sorted(self._tokens_counter.items(), key=lambda x:(-x[1], x[0]))
         self._index2tokens = map(lambda x: x[0], filter(lambda x: x[1]>self.frequency_threshold, tokens_freqeuncy))
-        self._index2tokens.append('<UNK>')
+        self._index2tokens.insert(0, '<PAD>')
+        self._index2tokens.insert(1, '<UNK>')
         self._tokens2index = {token:index for index, token in enumerate(self._index2tokens)}
         with open('stats/indexer.freqeuncy.{}.csv'.format(self.name), 'w') as f:
             writer = csv.writer(f, lineterminator=os.linesep)
             writer.writerows(tokens_freqeuncy)
+        with open('stats/indexer.selected_freqeuncy.{}.csv'.format(self.name), 'w') as f:
+            writer = csv.writer(f, lineterminator=os.linesep)
+            writer.writerows(enumerate(self._index2tokens))
 
     def get_index(self, token):
         assert not self._adding_words
@@ -156,6 +160,14 @@ class Embeddings():
         with open('stats/embeddings.notfound.{}.csv'.format(self.name), 'w') as f:
             writer = csv.writer(f, lineterminator=os.linesep)
             writer.writerows(map(lambda x: (str(x),), sorted(embeddings_not_found)))
+
+        # normalize
+        for i in range(vocab_size):
+            embeddings_matrix[i] = embeddings_matrix[i] / np.linalg.norm(embeddings_matrix[i])
+
+        # make '<PAD>' as 0
+        embeddings_matrix[self.indexer.get_index('<PAD>')] = 0
+
         return embeddings_matrix
 
 
