@@ -9,6 +9,7 @@ from torchvision import datasets, transforms
 from torch.autograd import Variable
 import math
 from collections import Counter
+import pandas as pd
 
 import numpy as np
 import logging
@@ -231,8 +232,10 @@ def forward_inspect(self, X0, indexer):
     # X2.shape
     # torch.Size([64, 60, 37])
     activations_conv = X2.cpu().data.numpy()
+    ngrams_heatmaps = []
+    ngrams_interest = []
     for i, activations_conv_i in enumerate(activations_conv):
-        ngrams_interest = []
+        ngrams_interest.append([])
         ngrams_map = Counter()
         for j, activations_conv_i_j in enumerate(activations_conv_i):
             # activation for i-th data point, j-th convolutional filter
@@ -244,9 +247,14 @@ def forward_inspect(self, X0, indexer):
             interest = activations_conv_i_j.max()
             ngram_location = slice(max(0, argmax_conv_i_j - pre), min(len(sentence), argmax_conv_i_j + post))
             ngram = sentence[ngram_location]
-            ngrams_interest.append((ngram_location, interest, ngram))
+            ngrams_interest[-1].append((ngram_location, interest, ngram))
             ngrams_map[tuple(ngram)] += interest
-        print(json.dumps({indexer.get_token(k):v for k, v in ngrams_map.items()}, indent=0))
+        ngrams_heatmap = [("_".join(map(indexer.get_token, k)), v) for k, v in ngrams_map.items()]
+        # print(ngrams_heatmap)
+        print(" ".join(map(indexer.get_token, sentence)))
+        for k, v in (sorted(ngrams_heatmap, key=lambda x: x[1])):
+            print("{}:\t{}".format(v, k))
+        ngrams_heatmaps.append(ngrams_heatmap)
 
     # 3. Apply pooling, activations
     if (self.conv1_stack_pooling == 'max'):
@@ -274,7 +282,31 @@ def forward_inspect(self, X0, indexer):
     # 4. Apply fully connected layer
     X5 = self.fc(X4.view(X4.size()[0], -1))
     # logger.debug("activations size: {}".format(x.size()))
-    return X5
+
+    (weights, bias) = map(lambda x: x.cpu().data.numpy(), self.fc.parameters())
+    print(weights, bias)
+
+    return X5, weights, bias, ngrams_interest
+
+def get_results(indexer, idx, X5, weights, bias, ngrams_interest):
+
+    print("logit (sick): " + str(X5[idx]))
+    print("bias: " + str(bias))
+
+    df = pd.DataFrame({
+        'weights': weights[0],
+        'activation': map(lambda x: x[1], ngrams_interest[idx]),
+        'indices': map(lambda x: x[2], ngrams_interest[idx]),
+    })
+
+    indices2ngram = lambda indices: "_".join(map(indexer.get_token, indices))
+    df.loc[:, 'ngram'] = map(indices2ngram, df.indices)
+    df.loc[:, 'partial'] = df.weights * df.activation
+    df = df.sort_values(by='partial', ascending=False)
+
+    print("partial sum: "+str(df.partial.sum()))
+
+    return df
 
 
 def get_params_list(net, trainable_only=True):
