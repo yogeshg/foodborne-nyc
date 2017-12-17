@@ -288,9 +288,13 @@ def forward_inspect(self, X0, indexer):
 
     return X5, weights, bias, ngrams_interest
 
-def get_results(indexer, idx, X5, weights, bias, ngrams_interest):
+def get_results(indexer, idx, X0, X5, weights, bias, ngrams_interest):
 
-    print("logit (sick): " + str(X5[idx]))
+    indices2ngram = lambda indices: "_".join(map(indexer.get_token, indices))
+    indices2text = lambda indices: " ".join(map(indexer.get_token, filter(lambda x: x>0, indices)))
+
+    print("sentence: " + indices2text(X0[idx].data.cpu().numpy()))
+    print("logit (sick): " + str(X5[idx].data.cpu().numpy()))
     print("bias: " + str(bias))
 
     df = pd.DataFrame({
@@ -299,7 +303,6 @@ def get_results(indexer, idx, X5, weights, bias, ngrams_interest):
         'indices': map(lambda x: x[2], ngrams_interest[idx]),
     })
 
-    indices2ngram = lambda indices: "_".join(map(indexer.get_token, indices))
     df.loc[:, 'ngram'] = map(indices2ngram, df.indices)
     df.loc[:, 'partial'] = df.weights * df.activation
     df = df.sort_values(by='partial', ascending=False)
