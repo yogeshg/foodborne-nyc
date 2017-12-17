@@ -11,3 +11,4 @@ spacy == 1.10.0
 # torch == 0.4.0a0+c52ca23
 # torchvision == 0.1.9
 xlrd
+profilehooks
