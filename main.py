@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 
 # Source
 import util
-commit_hash = util.save_code()
+commit_hash = 'dev' #util.save_code()
 from util.archiver import get_archiver
 import config as c
 

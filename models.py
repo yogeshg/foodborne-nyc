@@ -251,9 +251,9 @@ def forward_inspect(self, X0, indexer):
             ngrams_map[tuple(ngram)] += interest
         ngrams_heatmap = [("_".join(map(indexer.get_token, k)), v) for k, v in ngrams_map.items()]
         # print(ngrams_heatmap)
-        print(" ".join(map(indexer.get_token, sentence)))
-        for k, v in (sorted(ngrams_heatmap, key=lambda x: x[1])):
-            print("{}:\t{}".format(v, k))
+        # print(" ".join(map(indexer.get_token, sentence)))
+        # for k, v in (sorted(ngrams_heatmap, key=lambda x: x[1])):
+        #     print("{}:\t{}".format(v, k))
         ngrams_heatmaps.append(ngrams_heatmap)
 
     # 3. Apply pooling, activations
@@ -284,32 +284,63 @@ def forward_inspect(self, X0, indexer):
     # logger.debug("activations size: {}".format(x.size()))
 
     (weights, bias) = map(lambda x: x.cpu().data.numpy(), self.fc.parameters())
-    print(weights, bias)
+    # print(weights, bias)
 
     return X5, weights, bias, ngrams_interest
 
+
+def get_heatmap(idx, weights, ngrams_interest):
+    heatmap_pos = Counter()
+    heatmap_neg = Counter()
+    for w, (location, a, indices) in zip(weights[0], ngrams_interest[idx]):
+        p = w * a
+        location = np.array(range(1000))[location]
+        ngram_len = len(location)
+        for l in location:
+            if p > 0:
+                heatmap_pos[l] += float(p) / ngram_len
+            else:
+                heatmap_neg[l] += float(p) / ngram_len
+
+    return (heatmap_pos, heatmap_neg)
+
+
 def get_results(indexer, idx, X0, X5, weights, bias, ngrams_interest):
 
-    indices2ngram = lambda indices: "_".join(map(indexer.get_token, indices))
-    indices2text = lambda indices: " ".join(map(indexer.get_token, filter(lambda x: x>0, indices)))
+    # indices2ngram = lambda indices: "_".join(map(indexer.get_token, indices))
+    # indices2text = lambda indices: " ".join(map(indexer.get_token, filter(lambda x: x>0, indices)))
+    X0_numpy = X0[idx].data.cpu().numpy()
+    # sentence = indices2text(X0_numpy)
+    heatmap_pos = Counter()
+    heatmap_neg = Counter()
+    for w, (location, a, indices) in zip(weights[0], ngrams_interest[idx]):
+        p = w * a
+        location = np.array(range(1000))[location]
+        ngram_len = len(location)
+        for l in location:
+            if p > 0:
+                heatmap_pos[l] += float(p) / ngram_len
+            else:
+                heatmap_neg[l] += float(p) / ngram_len
 
-    print("sentence: " + indices2text(X0[idx].data.cpu().numpy()))
-    print("logit (sick): " + str(X5[idx].data.cpu().numpy()))
-    print("bias: " + str(bias))
+    # print("sentence: " + sentence)
+    # print("logit (sick): " + str(X5[idx].data.cpu().numpy()))
+    # print("bias: " + str(bias))
 
-    df = pd.DataFrame({
-        'weights': weights[0],
-        'activation': map(lambda x: x[1], ngrams_interest[idx]),
-        'indices': map(lambda x: x[2], ngrams_interest[idx]),
-    })
+    # df = pd.DataFrame({
+    #     'weights': weights[0],
+    #     'location': map(lambda x: x[0], ngrams_interest[idx]),
+    #     'activation': map(lambda x: x[1], ngrams_interest[idx]),
+    #     'indices': map(lambda x: x[2], ngrams_interest[idx]),
+    # })
+    #
+    # # df.loc[:, 'ngram'] = map(indices2ngram, df.indices)
+    # df.loc[:, 'partial'] = df.weights * df.activation
+    # df = df.sort_values(by='partial', ascending=False)
+    #
+    # print("partial sum: "+str(df.partial.sum()))
 
-    df.loc[:, 'ngram'] = map(indices2ngram, df.indices)
-    df.loc[:, 'partial'] = df.weights * df.activation
-    df = df.sort_values(by='partial', ascending=False)
-
-    print("partial sum: "+str(df.partial.sum()))
-
-    return df
+    return (heatmap_pos, heatmap_neg)
 
 
 def get_params_list(net, trainable_only=True):
