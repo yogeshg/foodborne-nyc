@@ -9,26 +9,28 @@ from contextlib import contextmanager
 
 import numpy as np
 
-# X = Variable(torch.cuda.LongTensor(main.training_set.X[:64]))
-
 model_dirname = 'data/models/20171217_022340_811949/'
 
 if main.training_set is None:
     main.load_data('twitter.biased', 'data/twitter_data/', 'data/glove.twitter.27B.200d.txt')
 
 
+"""
+Data related functions
+"""
+
 def indices2ngram(indices):
     return "_".join(map(main.indexer.get_token, indices))
-
 
 def indices2words(indices):
     return map(main.indexer.get_token, indices)
 
-
 def indices2text(indices):
     return " ".join(indices2words(indices))
 
-
+"""
+HTML related functions
+"""
 
 HTML_START = """
 <!DOCTYPE html>
@@ -76,7 +78,6 @@ def get_highlighted_word(text, r=0, b=0, alpha=0.5, mode='red-over-blue'):
 
     return html_format(r=r, b=b, text=text)
 
-
 def get_html(words, normalized_heatmap_pos, normalized_heatmap_neg):
     highlighted_words = []
     for i, w in enumerate(words):
@@ -86,6 +87,10 @@ def get_html(words, normalized_heatmap_pos, normalized_heatmap_neg):
     return "".join(highlighted_words)
 
 
+"""
+Math related functions
+"""
+
 def hedge(x, floor, ceil):
     if x < floor:
         return floor
@@ -94,10 +99,8 @@ def hedge(x, floor, ceil):
     else:
         return x
 
-
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
-
 
 def normalize_heatmap(heatmap, magnitude, floor, ceil):
     return Counter({k: hedge((v/np.abs(magnitude)), floor, ceil) for k,v in heatmap.items()})
@@ -105,12 +108,13 @@ def normalize_heatmap(heatmap, magnitude, floor, ceil):
 def normalize_heatmap_sigmoid(heatmap, floor, ceil):
     return Counter({k: (ceil-floor)*sigmoid(v)+floor for k,v in heatmap.items()})
 
-
-
 # earlier code:
 # normalized_heatmap = Counter({k: hedge((v/np.abs(logit)), -1, 1) for k,v in heatmap.items()})
 # normalized_heatmap = Counter({k: make_neg1_to_1(v) for k,v in normalized_heatmap.items()})
 
+"""
+Main Code
+"""
 
 with open_html_doc('a.html') as f:
 
@@ -135,7 +139,6 @@ with open_html_doc('a.html') as f:
             proba_red = hedge(2*proba-1, 0, 1)
             proba_blue = -hedge(2*proba-1, -1, 0)
 
-            sentence = indices2text(X0_numpy)
             heatmap_pos, heatmap_neg = models.get_heatmap(idx, weights, ngrams_interest)
             heatmap_pos = normalize_heatmap(heatmap_pos, logit, 0, 1)
             heatmap_neg = normalize_heatmap(heatmap_neg, logit, -1, 0)
@@ -145,7 +148,5 @@ with open_html_doc('a.html') as f:
             f.write(get_highlighted_word('{0:.2f}'.format(proba), r=proba_red, b=proba_blue))
             f.write(get_html(indices2words(X0_numpy), heatmap_pos, heatmap_neg))
             f.write("\n</br>\n")
-            # for i, vocab_i in enumerate(X0_numpy):
-            #     print((heatmap[i], main.indexer.get_token(vocab_i)))
 
 
