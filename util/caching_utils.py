@@ -1,6 +1,23 @@
 import json
 
 
+__idempotent_last_args = None
+__idempotent_last_result = None
+
+def idempotent(some_function):
+
+
+    def wrapper(*args):
+        global __idempotent_last_args, __idempotent_last_result
+        if __idempotent_last_args != args:
+            __idempotent_last_args = args
+            result = some_function(*args)
+            __idempotent_last_result = result
+        return __idempotent_last_result
+
+    return wrapper
+
+
 class FileDict(dict):
     def __init__(self, filename, dump_frequency):
         self.filename = filename

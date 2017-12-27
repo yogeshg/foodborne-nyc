@@ -37,6 +37,7 @@ training_set = None
 validation_set = None
 testing_set = None
 
+@util.idempotent
 def load_data(dataset, data_path, embeddings_path):
     global embeddings_matrix, indexer, training_set, validation_set, testing_set
     all_data = load.get_data(dataset, data_path, embeddings_path)
