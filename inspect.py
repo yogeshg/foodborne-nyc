@@ -9,10 +9,8 @@ from contextlib import contextmanager
 
 import numpy as np
 
-model_dirname = 'data/models/20171217_022340_811949/'
-
-if main.training_set is None:
-    main.load_data('twitter.biased', 'data/twitter_data/', 'data/glove.twitter.27B.200d.txt')
+import logging
+logger = logging.getLogger(__name__)
 
 
 """
@@ -116,37 +114,65 @@ def normalize_heatmap_sigmoid(heatmap, floor, ceil):
 Main Code
 """
 
-with open_html_doc('a.html') as f:
-
-    batch_size = 32
-    net = torch.load(os.path.join(model_dirname, 'checkpoint.net.pt'), map_location=lambda storage,y: storage)
-
-    for batch_id in range(0, np.ceil(main.validation_set.y.shape[0] / float(batch_size)).astype(int)):
-
-        batch_start = batch_size * batch_id
-        batch_end = batch_size * (batch_id+1)
-
-        X0 = Variable(torch.LongTensor(main.validation_set.X[batch_start:batch_end]))
-
-        X5, weights, bias, ngrams_interest = models.forward_inspect(net, X0, main.indexer)
-
-        for idx in range(main.validation_set.y[batch_start:batch_end].shape[0]):
-            X0_numpy = X0[idx].data.cpu().numpy()
-            X5_numpy = X5[idx].data.cpu().numpy()
-
-            logit = X5_numpy[0]
-            proba = sigmoid(logit)
-            proba_red = hedge(2*proba-1, 0, 1)
-            proba_blue = -hedge(2*proba-1, -1, 0)
-
-            heatmap_pos, heatmap_neg = models.get_heatmap(idx, weights, ngrams_interest)
-            heatmap_pos = normalize_heatmap(heatmap_pos, logit, 0, 1)
-            heatmap_neg = normalize_heatmap(heatmap_neg, logit, -1, 0)
-            # heatmap_pos = normalize_heatmap_sigmoid(heatmap_pos, 0, 1)
-            # heatmap_neg = normalize_heatmap_sigmoid(heatmap_neg, -1, 0)
-
-            f.write(get_highlighted_word('{0:.2f}'.format(proba), r=proba_red, b=proba_blue))
-            f.write(get_html(indices2words(X0_numpy), heatmap_pos, heatmap_neg))
-            f.write("\n</br>\n")
+selected_models = {
+"twitter.gold":   "data/results/20171217_174719_811949/",
+"twitter.silver": "data/results/20171217_021419_811949/",
+"twitter.biased": "data/results/20171217_022031_811949/",
+"yelp.gold":      "data/results/20171217_180912_811949/",
+"yelp.silver":    "data/results/20171217_091128_811949/",
+"yelp.biased":    "data/results/20171217_154214_811949/",
+}
 
 
+dataset_media = ('twitter', 'yelp')
+dataset_regimes = ('gold', 'silver', 'biased')
+
+data_paths = ('data/twitter_data/', 'data/yelp_data/')
+embeddings_paths = ('data/glove.twitter.27B.200d.txt', 'data/glove.840B.300d.txt')
+
+inputs = list(product(zip(dataset_media, data_paths, embeddings_paths), dataset_regimes))
+for hyperparameter_slice in (slice(None, -4), slice(-4, None)):
+    for (medium, data_path, embeddings_path), regime in inputs:
+        try:
+            dataset = medium + '.' + regime
+            main.load_data(dataset, data_path, embeddings_path)
+
+            with open_html_doc('stats/highlights.{}.html'.format(dataset)) as f:
+            
+                model_dirname = selected_models[dataset]
+
+                batch_size = 32
+                net = torch.load(os.path.join(model_dirname, 'checkpoint.net.pt'), map_location=lambda storage,y: storage)
+            
+                for batch_id in range(0, np.ceil(main.validation_set.y.shape[0] / float(batch_size)).astype(int)):
+            
+                    batch_start = batch_size * batch_id
+                    batch_end = batch_size * (batch_id+1)
+            
+                    X0 = Variable(torch.LongTensor(main.validation_set.X[batch_start:batch_end]))
+            
+                    X5, weights, bias, ngrams_interest = models.forward_inspect(net, X0, main.indexer)
+            
+                    for idx in range(main.validation_set.y[batch_start:batch_end].shape[0]):
+                        X0_numpy = X0[idx].data.cpu().numpy()
+                        X5_numpy = X5[idx].data.cpu().numpy()
+            
+                        logit = X5_numpy[0]
+                        proba = sigmoid(logit)
+                        proba_red = hedge(2*proba-1, 0, 1)
+                        proba_blue = -hedge(2*proba-1, -1, 0)
+            
+                        heatmap_pos, heatmap_neg = models.get_heatmap(idx, weights, ngrams_interest)
+                        heatmap_pos = normalize_heatmap(heatmap_pos, logit, 0, 1)
+                        heatmap_neg = normalize_heatmap(heatmap_neg, logit, -1, 0)
+                        # heatmap_pos = normalize_heatmap_sigmoid(heatmap_pos, 0, 1)
+                        # heatmap_neg = normalize_heatmap_sigmoid(heatmap_neg, -1, 0)
+            
+                        f.write(get_highlighted_word('{0:.2f}'.format(proba), r=proba_red, b=proba_blue))
+                        f.write(get_html(indices2words(X0_numpy), heatmap_pos, heatmap_neg))
+                        f.write("\n</br>\n")
+            
+        except Exception, e:
+            logger.exception(e)
+
+ 
