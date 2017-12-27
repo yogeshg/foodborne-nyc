@@ -5,6 +5,7 @@ import models
 import main
 import os
 from collections import Counter
+from itertools import product
 from contextlib import contextmanager
 
 import numpy as np
@@ -115,12 +116,12 @@ Main Code
 """
 
 selected_models = {
-"twitter.gold":   "data/results/20171217_174719_811949/",
-"twitter.silver": "data/results/20171217_021419_811949/",
-"twitter.biased": "data/results/20171217_022031_811949/",
-"yelp.gold":      "data/results/20171217_180912_811949/",
-"yelp.silver":    "data/results/20171217_091128_811949/",
-"yelp.biased":    "data/results/20171217_154214_811949/",
+"twitter.gold"   : "data/models/20171217_020721_811949/",
+"twitter.silver" : "data/models/20171217_175028_811949/",
+"twitter.biased" : "data/models/20171217_022127_811949/",
+"yelp.gold"      : "data/models/20171217_061943_811949/",
+"yelp.silver"    : "data/models/20171217_195647_811949/",
+"yelp.biased"    : "data/models/20171217_203244_811949/",
 }
 
 
