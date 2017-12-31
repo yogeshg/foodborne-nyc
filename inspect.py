@@ -153,7 +153,7 @@ embeddings_paths = ('data/glove.twitter.27B.200d.txt', 'data/glove.840B.300d.txt
 inputs = list(product(zip(dataset_media, data_paths, embeddings_paths), dataset_regimes))
 for hyperparameter_slice in (slice(None, -4), slice(-4, None)):
     for (medium, data_path, embeddings_path), regime in inputs:
-        # try:
+        try:
             dataset = medium + '.' + regime
             main.load_data(dataset, data_path, embeddings_path)
 
@@ -193,7 +193,7 @@ for hyperparameter_slice in (slice(None, -4), slice(-4, None)):
                         # heatmap_pos = normalize_heatmap_sigmoid(heatmap_pos, 0, 1)
                         # heatmap_neg = normalize_heatmap_sigmoid(heatmap_neg, -1, 0)
 
-                        label = '{0} (true:{1}, predicted:{2})'.format(confusion_category[idx],
+                        label = '{0} (true:{1}, predicted:{2}) '.format(confusion_category[idx],
                             get_highlighted_word('{0:.2f}'.format(y_true[idx]), r=y_true[idx], b=0),
                             get_highlighted_word('{0:.2f}'.format(proba), r=proba_red, b=proba_blue))
                         f.write(label)
