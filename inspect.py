@@ -14,6 +14,7 @@ import torch.nn.functional as F
 import logging
 logger = logging.getLogger(__name__)
 
+from collections import defaultdict
 
 """
 Data related functions
@@ -134,6 +135,8 @@ def normalize_heatmap_sigmoid(heatmap, floor, ceil):
 Main Code
 """
 
+sample_size = 10
+
 selected_models = {
 "twitter.gold"   : "data/models/20171217_020721_811949/",
 "twitter.silver" : "data/models/20171217_175028_811949/",
@@ -157,48 +160,56 @@ for hyperparameter_slice in (slice(None, -4), slice(-4, None)):
             dataset = medium + '.' + regime
             main.load_data(dataset, data_path, embeddings_path)
 
+            
+            model_dirname = selected_models[dataset]
+
+            batch_size = 32
+            net = torch.load(os.path.join(model_dirname, 'checkpoint.net.pt'), map_location=lambda storage,y: storage)
+            categorywise_all_html = defaultdict(list)
+        
+            for batch_id in range(0, np.ceil(main.validation_set.y.shape[0] / float(batch_size)).astype(int)):
+        
+                batch_start = batch_size * batch_id
+                batch_end = batch_size * (batch_id+1)
+        
+                X0 = Variable(torch.LongTensor(main.validation_set.X[batch_start:batch_end]))
+        
+                X5, weights, bias, ngrams_interest = models.forward_inspect(net, X0, main.indexer)
+                yp = F.sigmoid(X5)
+                yp = yp.resize(yp.size()[0])
+                y_pred = yp.data.cpu().numpy()
+                y_true = main.validation_set.y[batch_start:batch_end]
+                confusion_category = get_confusion_category(y_pred, y_true, 0.5)
+        
+                for idx in range(main.validation_set.y[batch_start:batch_end].shape[0]):
+                    X0_numpy = X0[idx].data.cpu().numpy()
+                    X5_numpy = X5[idx].data.cpu().numpy()
+        
+                    logit = X5_numpy[0]
+                    proba = y_pred[idx]
+                    proba_red = hedge(2*proba-1, 0, 1)
+                    proba_blue = -hedge(2*proba-1, -1, 0)
+        
+                    heatmap_pos, heatmap_neg = models.get_heatmap(idx, weights, ngrams_interest)
+                    heatmap_pos = normalize_heatmap(heatmap_pos, logit, 0, 1)
+                    heatmap_neg = normalize_heatmap(heatmap_neg, logit, -1, 0)
+                    # heatmap_pos = normalize_heatmap_sigmoid(heatmap_pos, 0, 1)
+                    # heatmap_neg = normalize_heatmap_sigmoid(heatmap_neg, -1, 0)
+
+                    category = confusion_category[idx]
+                    label = '{0} (true:{1}, predicted:{2}) '.format(category,
+                        get_highlighted_word('{0:.2f}'.format(y_true[idx]), r=y_true[idx], b=0),
+                        get_highlighted_word('{0:.2f}'.format(proba), r=proba_red, b=proba_blue))
+                    highlighted_html = get_html(indices2words(X0_numpy), heatmap_pos, heatmap_neg)
+                    categorywise_all_html[category].append(" ".join((label, highlighted_html)))
+
+            category_samples = {cat: np.random.choice(htmls, replace=False, size=sample_size)\
+                                    for cat, htmls in categorywise_all_html.items()}
+
             with open_html_doc('stats/highlights.{}.html'.format(dataset)) as f:
-            
-                model_dirname = selected_models[dataset]
-
-                batch_size = 32
-                net = torch.load(os.path.join(model_dirname, 'checkpoint.net.pt'), map_location=lambda storage,y: storage)
-            
-                for batch_id in range(0, np.ceil(main.validation_set.y.shape[0] / float(batch_size)).astype(int)):
-            
-                    batch_start = batch_size * batch_id
-                    batch_end = batch_size * (batch_id+1)
-            
-                    X0 = Variable(torch.LongTensor(main.validation_set.X[batch_start:batch_end]))
-            
-                    X5, weights, bias, ngrams_interest = models.forward_inspect(net, X0, main.indexer)
-                    yp = F.sigmoid(X5)
-                    yp = yp.resize(yp.size()[0])
-                    y_pred = yp.data.cpu().numpy()
-                    y_true = main.validation_set.y[batch_start:batch_end]
-                    confusion_category = get_confusion_category(y_pred, y_true, 0.5)
-            
-                    for idx in range(main.validation_set.y[batch_start:batch_end].shape[0]):
-                        X0_numpy = X0[idx].data.cpu().numpy()
-                        X5_numpy = X5[idx].data.cpu().numpy()
-            
-                        logit = X5_numpy[0]
-                        proba = y_pred[idx]
-                        proba_red = hedge(2*proba-1, 0, 1)
-                        proba_blue = -hedge(2*proba-1, -1, 0)
-            
-                        heatmap_pos, heatmap_neg = models.get_heatmap(idx, weights, ngrams_interest)
-                        heatmap_pos = normalize_heatmap(heatmap_pos, logit, 0, 1)
-                        heatmap_neg = normalize_heatmap(heatmap_neg, logit, -1, 0)
-                        # heatmap_pos = normalize_heatmap_sigmoid(heatmap_pos, 0, 1)
-                        # heatmap_neg = normalize_heatmap_sigmoid(heatmap_neg, -1, 0)
-
-                        label = '{0} (true:{1}, predicted:{2}) '.format(confusion_category[idx],
-                            get_highlighted_word('{0:.2f}'.format(y_true[idx]), r=y_true[idx], b=0),
-                            get_highlighted_word('{0:.2f}'.format(proba), r=proba_red, b=proba_blue))
-                        f.write(label)
-                        f.write(get_html(indices2words(X0_numpy), heatmap_pos, heatmap_neg))
-                        f.write("\n</br>\n")
+                for cat, htmls in category_samples.items():
+                    f.write("</br>\n".join(htmls))
+                    f.write("</br>\n")
 
         except Exception, e:
             logger.exception(e)
