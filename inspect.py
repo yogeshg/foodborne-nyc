@@ -94,7 +94,7 @@ def get_highlighted_word(text, r=0, b=0, alpha=0.5):
     assert 0 <= b <= 1 and 0 <= r <= 1, 'b,r: {}, {}'.format(b, r)
     b *= alpha
     r *= alpha
-    if r>0 and b>0:
+    if r>0 or b>0:
         return '<span \nstyle="color: rgb(0, 0, 0); background-color:rgb({r}, {g}, {b});">'\
         '{text}'\
         '</span>'.format(r=255-b*125, g=255-(r+b)*125, b=255-r*125, text=text)
