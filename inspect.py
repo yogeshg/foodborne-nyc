@@ -84,8 +84,8 @@ def get_highlighted_word_redoverblue(text, r=0, b=0, alpha=0.5):
     b *= alpha
     r *= alpha
     return \
-            '<span \nstyle="background-color: rgba(0, 0, 255, {b});">'\
-            '<span \nstyle="background-color: rgba(255, 0, 0, {r});">'\
+            '<span style="background-color: rgba(0, 0, 255, {b});">'\
+            '<span style="background-color: rgba(255, 0, 0, {r});">'\
             '{text}'\
             '</span>'\
             '</span>'.format(r=r, b=b, text=text)
@@ -95,8 +95,7 @@ def get_highlighted_word(text, r=0, b=0, alpha=0.5):
     b *= alpha
     r *= alpha
     if r>0 or b>0:
-        return '<span \nstyle="color: rgb(0, 0, 0); background-color:rgb({r}, {g}, {b});">'\
-        '{text}'\
+        return '<span style="background-color:rgb({r}, {g}, {b});">{text}'\
         '</span>'.format(r=255-b*125, g=255-(r+b)*125, b=255-r*125, text=text)
     else:
         return text
@@ -157,7 +156,7 @@ def normalize_heatmap_sigmoid(heatmap, floor, ceil):
 Main Code
 """
 
-sample_size = 10
+sample_size = 5
 
 selected_models = {
 "twitter.gold"   : "data/models/20171217_020721_811949/",
@@ -176,7 +175,7 @@ data_paths = ('data/twitter_data/', 'data/yelp_data/')
 embeddings_paths = ('data/glove.twitter.27B.200d.txt', 'data/glove.840B.300d.txt')
 
 inputs = list(product(zip(dataset_media, data_paths, embeddings_paths), dataset_regimes))
-for (medium, data_path, embeddings_path), regime in reversed(inputs):
+for (medium, data_path, embeddings_path), regime in inputs:
     try:
         dataset = medium + '.' + regime
         main.load_data(dataset, data_path, embeddings_path)
