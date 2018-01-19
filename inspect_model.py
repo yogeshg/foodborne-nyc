@@ -237,4 +237,5 @@ for (medium, data_path, embeddings_path), regime in inputs:
 
     except Exception, e:
         logger.exception(e)
+        raise e
 

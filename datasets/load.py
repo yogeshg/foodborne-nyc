@@ -324,11 +324,12 @@ def test2():
     logging.basicConfig(level=logging.DEBUG, format=
     '%(asctime)s:%(levelname)s:%(name)s:%(funcName)s:line %(lineno)d: %(message)s')
 
-    dataset = 'yelp.silver'
-    data_path = '/home/yogi/data/hdd550-data/fbnyc/yelp_data'
-    embeddings_path = '/home/yogi/data/hdd550-data/fbnyc-conv/glove.840B.300d.txt'
+    for regime in ('gold', 'silver', 'biased'):
+        dataset = 'yelp.' + regime
+        data_path = 'data/yelp_data'
+        embeddings_path = 'data/glove.840B.300d.txt'
 
-    get_data(dataset, data_path, embeddings_path)
+        get_data(dataset, data_path, embeddings_path)
 
 
 @profile(immediate=True)
@@ -336,11 +337,12 @@ def test1():
     logging.basicConfig(level=logging.DEBUG, format=
     '%(asctime)s:%(levelname)s:%(name)s:%(funcName)s:line %(lineno)d: %(message)s')
 
-    dataset = 'twitter.silver'
-    data_path = '/home/yogi/data/hdd550-data/fbnyc/twitter_data'
-    embeddings_path = '/home/yogi/data/hdd550-data/fbnyc-conv/glove.twitter.27B.200d.txt'
+    for regime in ('gold', 'silver', 'biased'):
+        dataset = 'twitter.' + regime
+        data_path = 'data/twitter_data'
+        embeddings_path = 'data/glove.twitter.27B.200d.txt'
 
-    get_data(dataset, data_path, embeddings_path)
+        get_data(dataset, data_path, embeddings_path)
 
 
 if __name__ == '__main__':
