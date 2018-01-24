@@ -1,4 +1,7 @@
 .idea/
+figures
+
+*.ipynb
 
 .gitignore
 archive/

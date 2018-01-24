@@ -35,49 +35,51 @@ def indices2text(indices):
 HTML related functions
 """
 
-HTML_START = """
-<!DOCTYPE html>
-<html>
-<head>
-    <style type="text/css">
+class HighlightedHtml:
 
-        /*PAD {padding-left:5px; border:1px dotted #f8f8f8f8;}*/
-        UNK {padding-left:15px; border:1px dotted #aaa;}
-        samples { display: table; }
-        sample { display: table-row; }
-        confusion_category { display: table-cell; border: solid 1px;}
-        true_probability { display: table-cell; border: solid 1px;}
-        predicted_probability { display: table-cell; border: solid 1px;}
-        highlighted_text { display: table-cell; border: solid 1px;}
+    START = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style type="text/css">
     
-    </style>
-</head>
-<body>
-<samples>
-"""
-HTML_END = """
-</samples>
-</body>
-</html>
-"""
-
-SAMPLE_XML = """
-<sample>
-    <confusion_category>{confusion_category}</confusion_category>
-    <true_probability>{true_probability}</true_probability>
-    <predicted_probability>{predicted_probability}</predicted_probability>
-    <highlighted_text>{highlighted_text}</highlighted_text>
-</sample>
-"""
+            /*PAD {padding-left:5px; border:1px dotted #f8f8f8f8;}*/
+            UNK {padding-left:15px; border:1px dotted #aaa;}
+            samples { display: table; }
+            sample { display: table-row; }
+            confusion_category { display: table-cell; border: solid 1px;}
+            true_probability { display: table-cell; border: solid 1px;}
+            predicted_probability { display: table-cell; border: solid 1px;}
+            highlighted_text { display: table-cell; border: solid 1px;}
+        
+        </style>
+    </head>
+    <body>
+    <samples>
+    """
+    END = """
+    </samples>
+    </body>
+    </html>
+    """
+    
+    SAMPLE_FORMAT = """
+    <sample>
+        <confusion_category>{confusion_category}</confusion_category>
+        <true_probability>{true_probability}</true_probability>
+        <predicted_probability>{predicted_probability}</predicted_probability>
+        <highlighted_text>{highlighted_text}</highlighted_text>
+    </sample>
+    """
 
 @contextmanager
-def open_html_doc(fname):
+def open_html_doc(fname, formatting_class):
     with open(fname, 'w') as f:
-        f.write(HTML_START)
+        f.write(formatting_class.START)
         try:
             yield f
         finally:
-            f.write(HTML_END)
+            f.write(formatting_class.END)
 
 def get_highlighted_word_redoverblue(text, r=0, b=0, alpha=0.5):
     assert 0 <= b <= 1 and 0 <= r <= 1, 'b,r: {}, {}'.format(b, r)
@@ -224,17 +226,18 @@ for (medium, data_path, embeddings_path), regime in inputs:
                 true_probability = get_highlighted_word('{0:.2f}'.format(y_true[idx]), r=y_true[idx], b=0)
                 predicted_probability = get_highlighted_word('{0:.2f}'.format(proba), r=proba_red, b=proba_blue)
                 highlighted_text = get_highlighted_words(indices2words(X0_numpy), heatmap_pos, heatmap_neg)
-                sample_xml = SAMPLE_XML.format(confusion_category=confusion_category, true_probability=true_probability,
+                sample_xml = HighlightedHtml.SAMPLE_FORMAT.format(confusion_category=confusion_category, true_probability=true_probability,
                     predicted_probability=predicted_probability, highlighted_text=highlighted_text)
                 categorywise_all_html[confusion_category].append(sample_xml)
 
         category_samples = {cat: np.random.choice(htmls, replace=False, size=sample_size)\
                                     for cat, htmls in categorywise_all_html.items()}
 
-        with open_html_doc('stats/highlights.{}.html'.format(dataset)) as f:
+        with open_html_doc('stats/highlights.{}.html'.format(dataset), HighlightedHtml) as f:
             for cat, sample_xmls in sorted(category_samples.items()):
                 f.write("\n".join(sample_xmls))
 
+        break
     except Exception, e:
         logger.exception(e)
         raise e
