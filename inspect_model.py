@@ -178,7 +178,6 @@ embeddings_paths = ('data/glove.twitter.27B.200d.txt', 'data/glove.840B.300d.txt
 
 inputs = list(product(zip(dataset_media, data_paths, embeddings_paths), dataset_regimes))
 for (medium, data_path, embeddings_path), regime in inputs:
-    try:
         dataset = medium + '.' + regime
         main.load_data(dataset, data_path, embeddings_path)
         assert main.indexer._index2tokens[0][:5] == '<PAD>'
@@ -237,8 +236,4 @@ for (medium, data_path, embeddings_path), regime in inputs:
             for cat, sample_xmls in sorted(category_samples.items()):
                 f.write("\n".join(sample_xmls))
 
-        break
-    except Exception, e:
-        logger.exception(e)
-        raise e
 

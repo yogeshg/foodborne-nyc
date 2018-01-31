@@ -171,8 +171,7 @@ class Embeddings():
         return embeddings_matrix
 
 
-DataSet = namedtuple('Dataset', ['X', 'y', 'z', 'w'])
-
+DataSet = namedtuple('DataSet', ['X', 'y', 'z', 'w'])
 
 class LoaderUnbiased():
     '''
@@ -288,6 +287,14 @@ class LoaderUnbiased():
             DataSet(X_testing, y_testing, w_testing, z_testing)
         )
 
+
+import  functools
+
+dname = '/tmp/fbnyc_data_processed'
+memoized = functools.partial(util.memoized, cache_type=util.DirDict,
+                               cache_type_args=[dname, 1])
+
+@memoized
 def get_data(dataset, data_path, embeddings_path):
     """
 
