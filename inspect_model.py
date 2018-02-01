@@ -35,14 +35,14 @@ def indices2text(indices):
 HTML related functions
 """
 
-class HighlightedHtml:
 
+class HighlightedHtml:
     START = """
     <!DOCTYPE html>
     <html>
     <head>
         <style type="text/css">
-    
+
             /*PAD {padding-left:5px; border:1px dotted #f8f8f8f8;}*/
             UNK {padding-left:15px; border:1px dotted #aaa;}
             samples { display: table; }
@@ -51,7 +51,7 @@ class HighlightedHtml:
             true_probability { display: table-cell; border: solid 1px;}
             predicted_probability { display: table-cell; border: solid 1px;}
             highlighted_text { display: table-cell; border: solid 1px;}
-        
+
         </style>
     </head>
     <body>
@@ -62,7 +62,7 @@ class HighlightedHtml:
     </body>
     </html>
     """
-    
+
     SAMPLE_FORMAT = """
     <sample>
         <confusion_category>{confusion_category}</confusion_category>
@@ -71,6 +71,60 @@ class HighlightedHtml:
         <highlighted_text>{highlighted_text}</highlighted_text>
     </sample>
     """
+
+    def get_highlighted_word(text, r=0, b=0, alpha=0.5):
+        assert 0 <= b <= 1 and 0 <= r <= 1, 'b,r: {}, {}'.format(b, r)
+        b *= alpha
+        r *= alpha
+        if r>0 or b>0:
+            return '<span style="background-color:rgb({r}, {g}, {b});">{text}'\
+            '</span>'.format(r=255-b*125, g=255-(r+b)*125, b=255-r*125, text=text)
+        else:
+            return text
+
+
+class HighlightedLatex:
+    START = """
+    \\begin{tabular}{r|r|p{0.8\\textwidth}}
+    Truth & Predicted & Highlighted Text \\\\
+    \\toprule
+    """
+    END = """
+    \\end{tabular}
+    """
+
+    SAMPLE_FORMAT = """
+    \\formatsample
+        {{{confusion_category}}}
+        {{{true_probability}}}
+        {{{predicted_probability}}}
+        {{{highlighted_text}}}
+    """
+
+    @staticmethod
+    def get_highlighted_word(text, r=0, b=0, alpha=0.5):
+        assert 0 <= b <= 1 and 0 <= r <= 1, 'b,r: {}, {}'.format(b, r)
+        b *= alpha
+        r *= alpha
+        if r > 0 or b > 0:
+            return '\\highlightedword{{{r}}}{{{g}}}{{{b}}}{{{text}}}'.format(
+                r = 1 - b * 0.5,
+                g = 1 - (r+b) * 0.5,
+                b = 1 - r * 0.5,
+                text = text
+            )
+        else:
+            return text
+
+    @staticmethod
+    def get_highlighted_words(words, normalized_heatmap_pos, normalized_heatmap_neg):
+        highlighted_words = []
+        for i, w in enumerate(words):
+            r = normalized_heatmap_pos[i]
+            b = -normalized_heatmap_neg[i]
+            highlighted_words.append(HighlightedLatex.get_highlighted_word(w+" ", r=r, b=b))
+        return "".join(highlighted_words)
+
 
 @contextmanager
 def open_html_doc(fname, formatting_class):
@@ -92,24 +146,6 @@ def get_highlighted_word_redoverblue(text, r=0, b=0, alpha=0.5):
             '</span>'\
             '</span>'.format(r=r, b=b, text=text)
 
-def get_highlighted_word(text, r=0, b=0, alpha=0.5):
-    assert 0 <= b <= 1 and 0 <= r <= 1, 'b,r: {}, {}'.format(b, r)
-    b *= alpha
-    r *= alpha
-    if r>0 or b>0:
-        return '<span style="background-color:rgb({r}, {g}, {b});">{text}'\
-        '</span>'.format(r=255-b*125, g=255-(r+b)*125, b=255-r*125, text=text)
-    else:
-        return text
-
-def get_highlighted_words(words, normalized_heatmap_pos, normalized_heatmap_neg):
-    highlighted_words = []
-    for i, w in enumerate(words):
-        r = normalized_heatmap_pos[i]
-        b = -normalized_heatmap_neg[i]
-        highlighted_words.append(get_highlighted_word(w+" ", r=r, b=b))
-    return "".join(highlighted_words)
-
 
 """
 Math related functions
@@ -125,10 +161,10 @@ def get_confusion_category(y_pred, y_true, threshold):
     true_negative = (~y_pred) & (~y_true)
 
     category = map(lambda x: "".join(x), zip(
-    map(lambda x: 'true_positive' if x else '', true_positive),
-        map(lambda x: 'false_positive' if x else '', false_positive),
-        map(lambda x: 'false_negative' if x else '', false_negative),
-        map(lambda x: 'true_negative' if x else '', true_negative)
+    map(lambda x: 'true positive' if x else '', true_positive),
+        map(lambda x: 'false positive' if x else '', false_positive),
+        map(lambda x: 'false negative' if x else '', false_negative),
+        map(lambda x: 'true negative' if x else '', true_negative)
     ))
 
     return category
@@ -180,11 +216,20 @@ inputs = list(product(zip(dataset_media, data_paths, embeddings_paths), dataset_
 for (medium, data_path, embeddings_path), regime in inputs:
         dataset = medium + '.' + regime
         main.load_data(dataset, data_path, embeddings_path)
-        assert main.indexer._index2tokens[0][:5] == '<PAD>'
-        main.indexer._index2tokens[0] = '<PAD></PAD>'
-        assert main.indexer._index2tokens[1][:5] == '<UNK>'
-        main.indexer._index2tokens[1] = '<UNK></UNK>'
-        
+        # assert main.indexer._index2tokens[0][:5] == '<PAD>'
+        main.indexer._index2tokens[0] = ''
+        # assert main.indexer._index2tokens[1][:5] == '<UNK>'
+        main.indexer._index2tokens[1] = '\unk'
+        try:
+            idx = main.indexer._tokens2index['#']
+            main.indexer._index2tokens[idx] = '\\#'
+            idx = main.indexer._tokens2index['$']
+            main.indexer._index2tokens[idx] = '\\$'
+            idx = main.indexer._tokens2index['&']
+            main.indexer._index2tokens[idx] = '\\&'
+        except Exception as e:
+            logger.info('error while trying to replace "#" by "\\#"')
+            logger.exception(e)
 
         model_dirname = selected_models[dataset]
 
@@ -222,18 +267,16 @@ for (medium, data_path, embeddings_path), regime in inputs:
                 # heatmap_neg = normalize_heatmap_sigmoid(heatmap_neg, -1, 0)
 
                 confusion_category = confusion_categories[idx]
-                true_probability = get_highlighted_word('{0:.2f}'.format(y_true[idx]), r=y_true[idx], b=0)
-                predicted_probability = get_highlighted_word('{0:.2f}'.format(proba), r=proba_red, b=proba_blue)
-                highlighted_text = get_highlighted_words(indices2words(X0_numpy), heatmap_pos, heatmap_neg)
-                sample_xml = HighlightedHtml.SAMPLE_FORMAT.format(confusion_category=confusion_category, true_probability=true_probability,
+                true_probability = HighlightedLatex.get_highlighted_word('{0:.2f}'.format(y_true[idx]), r=y_true[idx], b=0)
+                predicted_probability = HighlightedLatex.get_highlighted_word('{0:.2f}'.format(proba), r=proba_red, b=proba_blue)
+                highlighted_text = HighlightedLatex.get_highlighted_words(indices2words(X0_numpy), heatmap_pos, heatmap_neg)
+                sample_xml = HighlightedLatex.SAMPLE_FORMAT.format(confusion_category=confusion_category, true_probability=true_probability,
                     predicted_probability=predicted_probability, highlighted_text=highlighted_text)
                 categorywise_all_html[confusion_category].append(sample_xml)
 
         category_samples = {cat: np.random.choice(htmls, replace=False, size=sample_size)\
                                     for cat, htmls in categorywise_all_html.items()}
 
-        with open_html_doc('stats/highlights.{}.html'.format(dataset), HighlightedHtml) as f:
+        with open_html_doc('stats/highlights.{}.tex'.format(dataset), HighlightedLatex) as f:
             for cat, sample_xmls in sorted(category_samples.items()):
                 f.write("\n".join(sample_xmls))
-
-
