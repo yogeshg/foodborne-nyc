@@ -183,7 +183,7 @@ class LoaderUnbiased():
                 returns training and testing data
     '''
 
-    SILVER_SIZE = 1000
+    SILVER_SIZE = 10000
     TEST_SPLIT_DATE_STR = None
     VALIDATION_SPLIT = 0.1
 

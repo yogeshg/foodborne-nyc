@@ -4,7 +4,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 dataset_media = ('twitter', 'yelp')
-dataset_regimes = ('gold', 'silver', 'biased')
+dataset_regimes = ('silver',)
 
 data_paths = ('data/twitter_data/', 'data/yelp_data/')
 embeddings_paths = ('data/glove.twitter.27B.200d.txt', 'data/glove.840B.300d.txt')
