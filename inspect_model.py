@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 
 from collections import defaultdict
 
+from inspector import Inspector, get_heatmap
+
 """
 Data related functions
 """
@@ -85,12 +87,21 @@ class HighlightedHtml:
 
 class HighlightedLatex:
     START = """
-    \\begin{tabular}{r|r|p{0.8\\textwidth}}
-    Truth & Predicted & Highlighted Text \\\\
-    \\toprule
+    \\providecommand{\\formatsample}[4]{
+        #1 pred: #3 & {\\tiny #4} \\\\
+        \\midrule
+    }
+    \\providecommand{\\formatsampletable}[1]{
+        \\begin{tabular}{p{0.1\\textwidth}|p{0.9\\textwidth}}
+        Category & Highlighted Text \\\\
+        \\toprule
+        #1
+    }
+
+    \\formatsampletable{
     """
     END = """
-    \\end{tabular}
+    }
     """
 
     SAMPLE_FORMAT = """
@@ -190,32 +201,90 @@ def normalize_heatmap_sigmoid(heatmap, floor, ceil):
 # normalized_heatmap = Counter({k: hedge((v/np.abs(logit)), -1, 1) for k,v in heatmap.items()})
 # normalized_heatmap = Counter({k: make_neg1_to_1(v) for k,v in normalized_heatmap.items()})
 
+
+def get_all_html(model_dirname, dataset, embeddings, indexer, batch_size):
+    indices = np.argwhere(dataset.z == 0)
+    indices = [x[0] for x in indices]
+    # print((indices))
+    logger.info("consider a sample of {} for htmls".format(len(indices)))
+    # print(dataset.z)
+    # print(dataset.w)
+    num_batches = int(np.ceil(len(indices) / float(batch_size)).astype(int))
+    net = torch.load(os.path.join(model_dirname, 'checkpoint.net.pt'), map_location=lambda storage, y: storage)
+    net_inspector = Inspector(net, embeddings)
+    categorywise_all_html = defaultdict(list)
+
+    for batch_id in range(0, num_batches):
+        u.log_frequently(5, batch_id, logger.debug, 'processing batch {}'.format(batch_id))
+        _batch_start = batch_size * batch_id
+        _batch_end = batch_size * (batch_id + 1)
+        batch_indices = indices[_batch_start: _batch_end]
+
+        # print(dataset.X[_batch_start:_batch_end])
+        # print(dataset.X[batch_indices])
+        X0 = Variable(torch.cuda.LongTensor(dataset.X[batch_indices]))
+
+        X5, weights, bias, ngrams_interest = net_inspector.forward_inspect(X0, indexer)
+        yp = F.sigmoid(X5)
+        yp = yp.resize(yp.size()[0])
+        y_pred = yp.data.cpu().numpy()
+        y_true = dataset.y[batch_indices]
+        confusion_categories = get_confusion_category(y_pred, y_true, 0.5)
+
+
+        for idx in range(dataset.y[batch_indices].shape[0]):
+            X0_numpy = X0[idx].data.cpu().numpy()
+            X5_numpy = X5[idx].data.cpu().numpy()
+
+            logit = X5_numpy[0]
+            proba = y_pred[idx]
+            proba_red = hedge(2 * proba - 1, 0, 1)
+            proba_blue = -hedge(2 * proba - 1, -1, 0)
+
+            heatmap_pos, heatmap_neg = get_heatmap(idx, weights, ngrams_interest)
+            heatmap_pos = normalize_heatmap(heatmap_pos, logit, 0, 1)
+            heatmap_neg = normalize_heatmap(heatmap_neg, logit, -1, 0)
+            # heatmap_pos = normalize_heatmap_sigmoid(heatmap_pos, 0, 1)
+            # heatmap_neg = normalize_heatmap_sigmoid(heatmap_neg, -1, 0)
+
+            confusion_category = confusion_categories[idx]
+            true_probability = HighlightedLatex.get_highlighted_word('{0:.2f}'.format(y_true[idx]), r=y_true[idx], b=0)
+            predicted_probability = HighlightedLatex.get_highlighted_word('{0:.2f}'.format(proba), r=proba_red,
+                                                                          b=proba_blue)
+            highlighted_text = HighlightedLatex.get_highlighted_words(indices2words(X0_numpy), heatmap_pos, heatmap_neg)
+            sample_xml = HighlightedLatex.SAMPLE_FORMAT.format(confusion_category=confusion_category,
+                                                               true_probability=true_probability,
+                                                               predicted_probability=predicted_probability,
+                                                               highlighted_text=highlighted_text)
+            categorywise_all_html[confusion_category].append((sample_xml, y_true[idx], proba))
+
+    return categorywise_all_html
+
 """
 Main Code
 """
 
-sample_size = 5
+sample_size = 7
 
 selected_models = {
 "twitter.gold"   : "data/models/20171217_020721_811949/",
-"twitter.silver" : "data/models/20171217_175028_811949/",
-"twitter.biased" : "data/models/20171217_022127_811949/",
+# "twitter.silver" : "data/models/20171217_175028_811949/",
+# "twitter.biased" : "data/models/20171217_022127_811949/",
 "yelp.gold"      : "data/models/20171217_061943_811949/",
-"yelp.silver"    : "data/models/20171217_195647_811949/",
-"yelp.biased"    : "data/models/20171217_203244_811949/",
+# "yelp.silver"    : "data/models/20171217_195647_811949/",
+# "yelp.biased"    : "data/models/20171217_203244_811949/",
 }
 
 
 dataset_media = ('twitter', 'yelp')
-dataset_regimes = ('gold', 'silver', 'biased')
+dataset_regimes = ('gold',)
 
 data_paths = ('data/twitter_data/', 'data/yelp_data/')
 embeddings_paths = ('data/glove.twitter.27B.200d.txt', 'data/glove.840B.300d.txt')
 
 inputs = list(product(zip(dataset_media, data_paths, embeddings_paths), dataset_regimes))
 for (medium, data_path, embeddings_path), regime in inputs:
-        dataset = medium + '.' + regime
-        main.load_data(dataset, data_path, embeddings_path)
+        main.load_data(medium + '.gold', data_path, embeddings_path)
         # assert main.indexer._index2tokens[0][:5] == '<PAD>'
         main.indexer._index2tokens[0] = ''
         # assert main.indexer._index2tokens[1][:5] == '<UNK>'
@@ -231,52 +300,32 @@ for (medium, data_path, embeddings_path), regime in inputs:
             logger.info('error while trying to replace "#" by "\\#"')
             logger.exception(e)
 
+        dataset = medium + '.' + regime
         model_dirname = selected_models[dataset]
-
         batch_size = 32
-        net = torch.load(os.path.join(model_dirname, 'checkpoint.net.pt'), map_location=lambda storage,y: storage)
-        categorywise_all_html = defaultdict(list)
-        
-        for batch_id in range(0, np.ceil(main.validation_set.y.shape[0] / float(batch_size)).astype(int)):
-            u.log_frequently(5, batch_id, logger.debug, 'processing batch {}'.format(batch_id))
-            batch_start = batch_size * batch_id
-            batch_end = batch_size * (batch_id+1)
-        
-            X0 = Variable(torch.LongTensor(main.validation_set.X[batch_start:batch_end]))
-        
-            X5, weights, bias, ngrams_interest = models.forward_inspect(net, X0, main.indexer)
-            yp = F.sigmoid(X5)
-            yp = yp.resize(yp.size()[0])
-            y_pred = yp.data.cpu().numpy()
-            y_true = main.validation_set.y[batch_start:batch_end]
-            confusion_categories = get_confusion_category(y_pred, y_true, 0.5)
-        
-            for idx in range(main.validation_set.y[batch_start:batch_end].shape[0]):
-                X0_numpy = X0[idx].data.cpu().numpy()
-                X5_numpy = X5[idx].data.cpu().numpy()
-        
-                logit = X5_numpy[0]
-                proba = y_pred[idx]
-                proba_red = hedge(2*proba-1, 0, 1)
-                proba_blue = -hedge(2*proba-1, -1, 0)
-        
-                heatmap_pos, heatmap_neg = models.get_heatmap(idx, weights, ngrams_interest)
-                heatmap_pos = normalize_heatmap(heatmap_pos, logit, 0, 1)
-                heatmap_neg = normalize_heatmap(heatmap_neg, logit, -1, 0)
-                # heatmap_pos = normalize_heatmap_sigmoid(heatmap_pos, 0, 1)
-                # heatmap_neg = normalize_heatmap_sigmoid(heatmap_neg, -1, 0)
 
-                confusion_category = confusion_categories[idx]
-                true_probability = HighlightedLatex.get_highlighted_word('{0:.2f}'.format(y_true[idx]), r=y_true[idx], b=0)
-                predicted_probability = HighlightedLatex.get_highlighted_word('{0:.2f}'.format(proba), r=proba_red, b=proba_blue)
-                highlighted_text = HighlightedLatex.get_highlighted_words(indices2words(X0_numpy), heatmap_pos, heatmap_neg)
-                sample_xml = HighlightedLatex.SAMPLE_FORMAT.format(confusion_category=confusion_category, true_probability=true_probability,
-                    predicted_probability=predicted_probability, highlighted_text=highlighted_text)
-                categorywise_all_html[confusion_category].append(sample_xml)
+        categorywise_all_html = get_all_html(
+            model_dirname, main.testing_set, main.embeddings_matrix, main.indexer, batch_size
+        )
 
-        category_samples = {cat: np.random.choice(htmls, replace=False, size=sample_size)\
+        print([(cat, len(info))for cat, info in categorywise_all_html.items()])
+
+        def agreement(truth, pred):
+            return (2*pred - 1) * (2*truth - 1)
+
+        def sample_if_needed(l, sz):
+            if len(l) > sz:
+                return sorted(l, key=lambda x: agreement(x[1], x[2]))[:sz]
+                # return np.random.choice(l, replace=False, size=sz)
+            else:
+                return l
+        category_samples = {cat: sample_if_needed(htmls, sample_size)\
                                     for cat, htmls in categorywise_all_html.items()}
 
-        with open_html_doc('stats/highlights.{}.tex'.format(dataset), HighlightedLatex) as f:
-            for cat, sample_xmls in sorted(category_samples.items()):
-                f.write("\n".join(sample_xmls))
+        fname = 'stats/highlights.{}.tex'.format(dataset)
+        logging.info('writing to file: {}'.format(fname))
+        with open_html_doc(fname, HighlightedLatex) as f:
+            for cat, info in sorted(category_samples.items()):
+                f.write("\n".join(map(lambda x:x[0], info)))
+
+        # break

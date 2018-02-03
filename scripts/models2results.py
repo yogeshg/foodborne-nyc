@@ -72,7 +72,7 @@ def rename_datasets_sorted(df):
     df.dataset = df.dataset.map({d: str(i)+"."+d for i, d in enumerate(datasets) })
     return df
 
-df_all = rename_datasets_sorted(df_all)
+# df_all = rename_datasets_sorted(df_all)
 
 
 logger.info('sorted all information by {} and selected {} columns'.format(SORT_BY, SELECT_COLS))
